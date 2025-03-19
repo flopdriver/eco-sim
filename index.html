@@ -3,170 +3,183 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebGL Pixel Ecosystem Simulation</title>
+    <title>Pixel Ecosystem Simulation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌱</text></svg>">
 </head>
 <body>
-<h1>WebGL Pixel Ecosystem Simulation</h1>
-<p>A true pixel-based ecosystem where everything emerges from simple rules. Watch plants grow, insects move, and a complete ecosystem develop before your eyes.</p>
+<div class="page-container">
+    <header>
+        <h1>Pixel Ecosystem Simulation</h1>
+        <p class="subtitle">A true pixel-based ecosystem where plants, insects, water, and soil interact through emergent behaviors. Watch a complete ecosystem develop before your eyes.</p>
+    </header>
 
-<div class="webgl-error" id="webgl-error">
-    Your browser does not support WebGL, which is required for this simulation.
-</div>
+    <div class="webgl-error" id="webgl-error">
+        <strong>WebGL Not Supported</strong> - Your browser does not support WebGL, which is required for this simulation. Please try a different browser.
+    </div>
 
-<div class="simulation-container">
+    <div class="simulation-container">
+        <div class="controls-panel">
 
-    <div class="controls-panel">
-        <div class="control-group">
-            <h3>Tools</h3>
-            <div class="tools">
-                <div class="tool-button active" data-tool="water">Water</div>
-                <div class="tool-button" data-tool="seed">Plant Seed</div>
-                <div class="tool-button" data-tool="dig">Dig</div>
-                <div class="tool-button" data-tool="insect">Add Insect</div>
-                <div class="tool-button" data-tool="worm">Add Worm</div>
-                <div class="tool-button" data-tool="observe">Observe</div>
+            <div class="control-group">
+                <h3>Simulation</h3>
+                <button class="button-control" id="pause-button">Pause</button>
+                <button class="button-control" id="reset-button">Reset</button>
+                <div class="slider-control">
+                    <label>
+                        <span>Speed</span>
+                        <span id="speed-value">1x</span>
+                    </label>
+                    <input type="range" id="speed-slider" min="1" max="10" value="1">
+                </div>
+                <div class="slider-control">
+                    <label>
+                        <span>Brush Size</span>
+                        <span id="brush-value">3px</span>
+                    </label>
+                    <input type="range" id="brush-slider" min="1" max="10" value="3">
+                </div>
             </div>
 
-            <div class="visualization-modes">
-                <div class="viz-button active" data-mode="normal">Normal</div>
-                <div class="viz-button" data-mode="moisture">Moisture</div>
-                <div class="viz-button" data-mode="energy">Energy</div>
-                <div class="viz-button" data-mode="nutrient">Nutrients</div>
+            <div class="control-group">
+                <h3>Stats</h3>
+                <div class="stats">
+                    <div>
+                        <span>FPS</span>
+                        <span id="fps-counter">60</span>
+                    </div>
+                    <div>
+                        <span>Active Pixels</span>
+                        <span id="active-counter">0</span>
+                    </div>
+                    <div>
+                        <span>Plants</span>
+                        <span id="plant-counter">0</span>
+                    </div>
+                    <div>
+                        <span>Insects</span>
+                        <span id="insect-counter">0</span>
+                    </div>
+                    <div>
+                        <span>Water Pixels</span>
+                        <span id="water-counter">0</span>
+                    </div>
+                    <div>
+                        <span>Time</span>
+                        <span id="day-night-indicator">Day</span>
+                    </div>
+                </div>
             </div>
+
+            <div class="control-group">
+                <h3>Tools</h3>
+                <div class="tools">
+                    <div class="tool-button active" data-tool="water">Water</div>
+                    <div class="tool-button" data-tool="seed">Plant Seed</div>
+                    <div class="tool-button" data-tool="dig">Dig</div>
+                    <div class="tool-button" data-tool="insect">Add Insect</div>
+                    <div class="tool-button" data-tool="worm">Add Worm</div>
+                    <div class="tool-button" data-tool="observe">Observe</div>
+                </div>
+                <h3>Visualization</h3>
+                <div class="visualization-modes">
+                    <div class="viz-button active" data-mode="normal">Normal</div>
+                    <div class="viz-button" data-mode="moisture">Moisture</div>
+                    <div class="viz-button" data-mode="energy">Energy</div>
+                    <div class="viz-button" data-mode="nutrient">Nutrients</div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Environment</h3>
+                <div class="slider-control">
+                    <label>
+                        <span>Rain Frequency</span>
+                        <span id="rain-value">50%</span>
+                    </label>
+                    <input type="range" id="rain-slider" min="0" max="100" value="50">
+                </div>
+                <div class="slider-control">
+                    <label>
+                        <span>Temperature</span>
+                        <span id="temp-value">Normal</span>
+                    </label>
+                    <input type="range" id="temp-slider" min="0" max="100" value="50">
+                </div>
+                <div class="slider-control">
+                    <label>
+                        <span>Day Length</span>
+                        <span id="day-value">Normal</span>
+                    </label>
+                    <input type="range" id="day-slider" min="1" max="10" value="5">
+                </div>
+            </div>
+
+
+
+
         </div>
 
-        <div class="control-group">
-            <h3>Environment</h3>
-            <div class="slider-control">
-                <label>
-                    <span>Rain Frequency</span>
-                    <span id="rain-value">0.1%</span>
-                </label>
-                <input type="range" id="rain-slider" min="0" max="100" value="50">
-            </div>
-            <div class="slider-control">
-                <label>
-                    <span>Temperature</span>
-                    <span id="temp-value">Normal</span>
-                </label>
-                <input type="range" id="temp-slider" min="0" max="100" value="50">
-            </div>
-            <div class="slider-control">
-                <label>
-                    <span>Day Length</span>
-                    <span id="day-value">Normal</span>
-                </label>
-                <input type="range" id="day-slider" min="1" max="10" value="5">
-            </div>
-        </div>
+        <div class="canvas-container">
+            <canvas id="ecosystem-canvas"></canvas>
 
-        <div class="control-group">
-            <h3>Simulation</h3>
-            <button class="button-control" id="pause-button">Pause</button>
-            <button class="button-control" id="reset-button">Reset</button>
-            <div class="slider-control">
-                <label>
-                    <span>Speed</span>
-                    <span id="speed-value">1x</span>
-                </label>
-                <input type="range" id="speed-slider" min="1" max="10" value="1">
-            </div>
-            <div class="slider-control">
-                <label>
-                    <span>Brush Size</span>
-                    <span id="brush-value">3px</span>
-                </label>
-                <input type="range" id="brush-slider" min="1" max="10" value="3">
-            </div>
-        </div>
-
-        <div class="control-group">
-            <h3>Stats</h3>
-            <div class="stats">
-                <div>
-                    <span>FPS:</span>
-                    <span id="fps-counter">60</span>
-                </div>
-                <div>
-                    <span>Active Pixels:</span>
-                    <span id="active-counter">0</span>
-                </div>
-                <div>
-                    <span>Plants:</span>
-                    <span id="plant-counter">0</span>
-                </div>
-                <div>
-                    <span>Insects:</span>
-                    <span id="insect-counter">0</span>
-                </div>
-                <div>
-                    <span>Water Pixels:</span>
-                    <span id="water-counter">0</span>
-                </div>
-                <div>
-                    <span>Time:</span>
-                    <span id="day-night-indicator">Day</span>
-                </div>
+            <!-- Loading screen overlay -->
+            <div class="loading-screen" id="loading-screen">
+                <div class="loading-spinner"></div>
+                <p>Initializing Ecosystem...</p>
             </div>
         </div>
     </div>
 
-    <div class="canvas-container">
-        <canvas id="ecosystem-canvas"></canvas>
+    <div class="info-section">
+        <div class="info-title">
+            <h2>About This Ecosystem</h2>
+            <p>
+                This is a true pixel-based ecosystem simulation where every element is simulated at the individual pixel level.
+                Unlike sprite-based simulations, everything here emerges naturally from simple rules and
+                interactions between pixels, creating complex emergent behaviors.
+            </p>
+        </div>
 
-        <!-- Loading screen overlay -->
-        <div class="loading-screen" id="loading-screen">
-            <div class="loading-spinner"></div>
-            <p>Initializing Ecosystem...</p>
+        <div class="info-grid">
+            <div class="info-card">
+                <h3>Plants</h3>
+                <p>Plants grow from seeds, developing roots to absorb water and nutrients, stems that reach for light, and leaves that perform photosynthesis. They produce seeds to reproduce when conditions are favorable.</p>
+            </div>
+
+            <div class="info-card">
+                <h3>Water</h3>
+                <p>Water flows realistically with gravity, can be absorbed by soil, and is transported through plants for growth. It evaporates in warm conditions and returns as rain, completing the water cycle.</p>
+            </div>
+
+            <div class="info-card">
+                <h3>Soil</h3>
+                <p>Soil holds moisture and nutrients. It can be dry, wet, or fertile, affecting plant growth and ecosystem health. Dead organisms decompose into soil, returning nutrients to the system.</p>
+            </div>
+
+            <div class="info-card">
+                <h3>Insects</h3>
+                <p>Insects move around, seeking plants to eat. They reproduce when they have enough energy and die when they don't. Their population naturally balances with the available plant life.</p>
+            </div>
+
+            <div class="info-card">
+                <h3>Worms</h3>
+                <p>Worms move through soil, eating dead matter and aerating the soil in the process. They improve soil fertility and help complete the decomposition cycle of the ecosystem.</p>
+            </div>
+
+            <div class="info-card">
+                <h3>Weather</h3>
+                <p>The simulation includes a day/night cycle, rain events, and temperature fluctuations that affect all organisms. These environmental factors create dynamic conditions that the ecosystem must adapt to.</p>
+            </div>
         </div>
     </div>
 
-
-</div>
-
-<div class="info-section">
-    <div class="info-title">
-        <br>
-        <h2>About This Simulation</h2>
-        <p>
-            This is a true pixel-based ecosystem simulation where every element, from soil particles to plant cells to insects,
-            is simulated at the pixel level. Unlike sprite-based simulations, everything here emerges naturally
-            from simple rules and interactions between individual pixels.
-        </p>
-    </div>
-
-    <div class="info-grid">
-        <div class="info-card">
-            <h3>Plants</h3>
-            <p>Plants grow from seeds, developing roots to absorb water and nutrients, stems that reach for light, and leaves that perform photosynthesis.</p>
-        </div>
-
-        <div class="info-card">
-            <h3>Water</h3>
-            <p>Water flows realistically with gravity, can be absorbed by soil, and is transported through plants for growth.</p>
-        </div>
-
-        <div class="info-card">
-            <h3>Soil</h3>
-            <p>Soil holds moisture and nutrients. It can be dry, wet, or fertile, affecting plant growth and ecosystem health.</p>
-        </div>
-
-        <div class="info-card">
-            <h3>Insects</h3>
-            <p>Insects move around, seeking plants to eat. They reproduce when they have enough energy and die when they don't.</p>
-        </div>
-
-        <div class="info-card">
-            <h3>Worms</h3>
-            <p>Worms move through soil, eating dead matter and making soil more fertile through aeration.</p>
-        </div>
-
-        <div class="info-card">
-            <h3>Weather</h3>
-            <p>The simulation includes a day/night cycle, rain events, and temperature fluctuations that affect all organisms.</p>
-        </div>
-    </div>
+    <footer>
+        <p>Pixel Ecosystem Simulation — A WebGL-based project showcasing emergent behaviors from simple pixel interactions.</p>
+    </footer>
 </div>
 
 <!-- Script imports -->
