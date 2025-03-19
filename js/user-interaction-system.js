@@ -1,7 +1,7 @@
 // User Interaction System
 // Handles user input and interaction with the simulation
 
-const UserInteractionSystem = {
+window.UserInteractionSystem = {
     // Reference to core simulation
     core: null,
 

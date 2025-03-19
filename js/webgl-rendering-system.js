@@ -24,8 +24,8 @@ void main() {
 }
 `;
 
-// WebGL Rendering System Module
-const WebGLRenderingSystem = {
+// WebGL Rendering System Module - defined in global scope for access by other modules
+window.WebGLRenderingSystem = {
     canvas: null,
     gl: null,
 
@@ -89,7 +89,7 @@ const WebGLRenderingSystem = {
         this.canvas.height = core.height * core.pixelSize;
 
         // Try to get WebGL context
-        this.gl = this.canvas.getContext('webgl') || this.canvas.getContext('experimental-webgl');
+        this.gl = WebGLUtils.getContext(this.canvas);
         if (!this.gl) {
             console.error('WebGL not supported, falling back to canvas 2D');
             return null;
@@ -114,40 +114,19 @@ const WebGLRenderingSystem = {
         const gl = this.gl;
 
         // Create shaders
-        const vertexShader = this.createShader(gl.VERTEX_SHADER, vertexShaderSource);
-        const fragmentShader = this.createShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
+        const vertexShader = WebGLUtils.createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+        const fragmentShader = WebGLUtils.createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
 
         // Create program and link shaders
-        this.program = gl.createProgram();
-        gl.attachShader(this.program, vertexShader);
-        gl.attachShader(this.program, fragmentShader);
-        gl.linkProgram(this.program);
-
-        // Check if linking succeeded
-        if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) {
-            console.error('Unable to initialize shader program:', gl.getProgramInfoLog(this.program));
+        this.program = WebGLUtils.createProgram(gl, vertexShader, fragmentShader);
+        if (!this.program) {
+            console.error('Unable to initialize shader program');
             return;
         }
 
         // Get attribute locations
         this.positionLocation = gl.getAttribLocation(this.program, 'a_position');
         this.texCoordLocation = gl.getAttribLocation(this.program, 'a_texCoord');
-    },
-
-    createShader: function(type, source) {
-        const gl = this.gl;
-        const shader = gl.createShader(type);
-        gl.shaderSource(shader, source);
-        gl.compileShader(shader);
-
-        // Check if compilation succeeded
-        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-            console.error('Shader compilation error:', gl.getShaderInfoLog(shader));
-            gl.deleteShader(shader);
-            return null;
-        }
-
-        return shader;
     },
 
     setupBuffers: function() {
@@ -482,60 +461,5 @@ const WebGLRenderingSystem = {
         this.canvas.width = width;
         this.canvas.height = height;
         this.gl.viewport(0, 0, width, height);
-    }
-};
-
-// WebGL utility functions
-const WebGLUtils = {
-    // Check if WebGL is supported
-    isWebGLSupported: function() {
-        try {
-            const canvas = document.createElement('canvas');
-            return !!(window.WebGLRenderingContext &&
-                (canvas.getContext('webgl') ||
-                    canvas.getContext('experimental-webgl')));
-        } catch (e) {
-            return false;
-        }
-    },
-
-    // Get WebGL context with error handling
-    getContext: function(canvas) {
-        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-        if (!gl) {
-            console.error('WebGL not supported. Please use a different browser.');
-            return null;
-        }
-        return gl;
-    },
-
-    // Create and compile a shader
-    createShader: function(gl, type, source) {
-        const shader = gl.createShader(type);
-        gl.shaderSource(shader, source);
-        gl.compileShader(shader);
-
-        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-            console.error('Shader compilation error:', gl.getShaderInfoLog(shader));
-            gl.deleteShader(shader);
-            return null;
-        }
-
-        return shader;
-    },
-
-    // Create and link a shader program
-    createProgram: function(gl, vertexShader, fragmentShader) {
-        const program = gl.createProgram();
-        gl.attachShader(program, vertexShader);
-        gl.attachShader(program, fragmentShader);
-        gl.linkProgram(program);
-
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-            console.error('Program linking error:', gl.getProgramInfoLog(program));
-            return null;
-        }
-
-        return program;
     }
 };
