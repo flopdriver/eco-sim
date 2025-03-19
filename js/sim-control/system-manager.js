@@ -21,12 +21,20 @@ const SystemManager = {
             return false;
         }
 
+        // Set TYPE and STATE on core immediately
+        this.controller.core.TYPE = this.controller.TYPE;
+        this.controller.core.STATE = this.controller.STATE;
+
         // 2. Environment system (depends on core)
         this.controller.environment = EnvironmentSystem.init(this.controller.core);
         if (!this.controller.environment) {
             console.error("Failed to initialize environment system.");
             return false;
         }
+
+        // Set TYPE and STATE on environment immediately
+        this.controller.environment.TYPE = this.controller.TYPE;
+        this.controller.environment.STATE = this.controller.STATE;
 
         // 3. Physics system (depends on core)
         this.controller.physics = PhysicsSystem.init(this.controller.core);
@@ -35,12 +43,21 @@ const SystemManager = {
             return false;
         }
 
+        // Set TYPE and STATE on physics immediately
+        this.controller.physics.TYPE = this.controller.TYPE;
+        this.controller.physics.STATE = this.controller.STATE;
+
         // 4. Biology system (depends on core and environment)
         this.controller.biology = BiologySystem.init(this.controller.core);
         if (!this.controller.biology) {
             console.error("Failed to initialize biology system.");
             return false;
         }
+
+        // Set TYPE and STATE on biology immediately
+        this.controller.biology.TYPE = this.controller.TYPE;
+        this.controller.biology.STATE = this.controller.STATE;
+        this.controller.biology.propagateConstants();
 
         // 5. Rendering system (depends on core)
         this.controller.rendering = WebGLRenderingSystem.init(this.controller.core, canvasId);
@@ -59,6 +76,12 @@ const SystemManager = {
             return false;
         }
 
+        // Set TYPE and STATE on user interaction immediately
+        this.controller.userInteraction.TYPE = this.controller.TYPE;
+        this.controller.userInteraction.STATE = this.controller.STATE;
+        this.controller.userInteraction.propagateConstants();
+
+        console.log("All subsystems initialized successfully");
         return true;
     },
 
@@ -66,19 +89,37 @@ const SystemManager = {
     propagateConstants: function() {
         console.log("Propagating constants to subsystems...");
 
+        // Verify TYPE and STATE are valid
+        if (!this.controller.TYPE || !this.controller.STATE) {
+            console.error("TYPE and STATE not initialized in controller");
+            return false;
+        }
+
         // Set TYPE and STATE on all main systems
         this.controller.core.TYPE = this.controller.TYPE;
         this.controller.core.STATE = this.controller.STATE;
+
         this.controller.environment.TYPE = this.controller.TYPE;
         this.controller.environment.STATE = this.controller.STATE;
+
         this.controller.physics.TYPE = this.controller.TYPE;
         this.controller.physics.STATE = this.controller.STATE;
+
         this.controller.biology.TYPE = this.controller.TYPE;
         this.controller.biology.STATE = this.controller.STATE;
+
         this.controller.rendering.TYPE = this.controller.TYPE;
         this.controller.rendering.STATE = this.controller.STATE;
+
         this.controller.userInteraction.TYPE = this.controller.TYPE;
         this.controller.userInteraction.STATE = this.controller.STATE;
+
+        // Propagate to rendering subsystems specifically
+        if (window.ColorMapper) {
+            window.ColorMapper.TYPE = this.controller.TYPE;
+            window.ColorMapper.STATE = this.controller.STATE;
+            window.ColorMapper.core = this.controller.core;
+        }
 
         // Propagate to biology subsystems
         if (this.controller.biology) {
@@ -89,5 +130,8 @@ const SystemManager = {
         if (this.controller.userInteraction) {
             this.controller.userInteraction.propagateConstants();
         }
+
+        console.log("Constants propagated successfully");
+        return true;
     }
 };

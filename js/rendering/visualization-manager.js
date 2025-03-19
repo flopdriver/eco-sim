@@ -55,7 +55,7 @@ window.VisualizationManager = {
 
     // Get current visualization mode
     getMode: function() {
-        return this.mode || 'normal';  // Ensure we always return a valid mode
+        return this.mode;
     },
 
     // Get color palette for current mode

@@ -124,8 +124,7 @@ window.WebGLRendererCore = {
                 const texIndex = index * 4;
 
                 // Get color based on pixel properties and current visualization mode
-                // Make sure we're using the properly initialized ColorMapper instance
-                const color = window.WebGLRenderingSystem.colorMapper.getPixelColor(index);
+                const color = ColorMapper.getPixelColor(index);
 
                 // Set RGBA values in texture data
                 this.textureData[texIndex + 0] = color.r;  // R
