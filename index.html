@@ -22,18 +22,17 @@
     </div>
 
     <div class="simulation-container">
-        <div class="controls-panel">
-
+        <!-- Left tools panel -->
+        <div class="controls-panel left-panel">
             <div class="control-group">
-                <h3>Simulation</h3>
-                <button class="button-control" id="pause-button">Pause</button>
-                <button class="button-control" id="reset-button">Reset</button>
-                <div class="slider-control">
-                    <label>
-                        <span>Speed</span>
-                        <span id="speed-value">1x</span>
-                    </label>
-                    <input type="range" id="speed-slider" min="1" max="10" value="1">
+                <h3>Tools</h3>
+                <div class="tools">
+                    <div class="tool-button active" data-tool="water">Water</div>
+                    <div class="tool-button" data-tool="seed">Plant Seed</div>
+                    <div class="tool-button" data-tool="dig">Dig</div>
+                    <div class="tool-button" data-tool="insect">Add Insect</div>
+                    <div class="tool-button" data-tool="worm">Add Worm</div>
+                    <div class="tool-button" data-tool="observe">Observe</div>
                 </div>
                 <div class="slider-control">
                     <label>
@@ -41,6 +40,68 @@
                         <span id="brush-value">3px</span>
                     </label>
                     <input type="range" id="brush-slider" min="1" max="10" value="3">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Environment</h3>
+                <div class="slider-control">
+                    <label>
+                        <span>Rain Frequency</span>
+                        <span id="rain-value">50%</span>
+                    </label>
+                    <input type="range" id="rain-slider" min="0" max="100" value="50">
+                </div>
+                <div class="slider-control">
+                    <label>
+                        <span>Temperature</span>
+                        <span id="temp-value">Normal</span>
+                    </label>
+                    <input type="range" id="temp-slider" min="0" max="100" value="50">
+                </div>
+                <div class="slider-control">
+                    <label>
+                        <span>Day Length</span>
+                        <span id="day-value">Normal</span>
+                    </label>
+                    <input type="range" id="day-slider" min="1" max="10" value="5">
+                </div>
+            </div>
+        </div>
+
+        <!-- Main simulation canvas (center) -->
+        <div class="canvas-container">
+            <canvas id="ecosystem-canvas"></canvas>
+
+            <!-- Loading screen overlay -->
+            <div class="loading-screen" id="loading-screen">
+                <div class="loading-spinner"></div>
+                <p>Initializing Ecosystem...</p>
+            </div>
+
+            <!-- Simulation controls - beneath the canvas -->
+            <div class="sim-controls">
+                <button class="button-control" id="pause-button">Pause</button>
+                <button class="button-control" id="reset-button">Reset</button>
+                <div class="slider-control horizontal">
+                    <label>
+                        <span>Speed</span>
+                        <span id="speed-value">1x</span>
+                    </label>
+                    <input type="range" id="speed-slider" min="1" max="10" value="1">
+                </div>
+            </div>
+        </div>
+
+        <!-- Right tools panel -->
+        <div class="controls-panel right-panel">
+            <div class="control-group">
+                <h3>Visualization</h3>
+                <div class="visualization-modes">
+                    <div class="viz-button active" data-mode="normal">Normal</div>
+                    <div class="viz-button" data-mode="moisture">Moisture</div>
+                    <div class="viz-button" data-mode="energy">Energy</div>
+                    <div class="viz-button" data-mode="nutrient">Nutrients</div>
                 </div>
             </div>
 
@@ -72,64 +133,6 @@
                         <span id="day-night-indicator">Day</span>
                     </div>
                 </div>
-            </div>
-
-            <div class="control-group">
-                <h3>Tools</h3>
-                <div class="tools">
-                    <div class="tool-button active" data-tool="water">Water</div>
-                    <div class="tool-button" data-tool="seed">Plant Seed</div>
-                    <div class="tool-button" data-tool="dig">Dig</div>
-                    <div class="tool-button" data-tool="insect">Add Insect</div>
-                    <div class="tool-button" data-tool="worm">Add Worm</div>
-                    <div class="tool-button" data-tool="observe">Observe</div>
-                </div>
-                <h3>Visualization</h3>
-                <div class="visualization-modes">
-                    <div class="viz-button active" data-mode="normal">Normal</div>
-                    <div class="viz-button" data-mode="moisture">Moisture</div>
-                    <div class="viz-button" data-mode="energy">Energy</div>
-                    <div class="viz-button" data-mode="nutrient">Nutrients</div>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <h3>Environment</h3>
-                <div class="slider-control">
-                    <label>
-                        <span>Rain Frequency</span>
-                        <span id="rain-value">50%</span>
-                    </label>
-                    <input type="range" id="rain-slider" min="0" max="100" value="50">
-                </div>
-                <div class="slider-control">
-                    <label>
-                        <span>Temperature</span>
-                        <span id="temp-value">Normal</span>
-                    </label>
-                    <input type="range" id="temp-slider" min="0" max="100" value="50">
-                </div>
-                <div class="slider-control">
-                    <label>
-                        <span>Day Length</span>
-                        <span id="day-value">Normal</span>
-                    </label>
-                    <input type="range" id="day-slider" min="1" max="10" value="5">
-                </div>
-            </div>
-
-
-
-
-        </div>
-
-        <div class="canvas-container">
-            <canvas id="ecosystem-canvas"></canvas>
-
-            <!-- Loading screen overlay -->
-            <div class="loading-screen" id="loading-screen">
-                <div class="loading-spinner"></div>
-                <p>Initializing Ecosystem...</p>
             </div>
         </div>
     </div>
@@ -252,6 +255,36 @@
                 errorElement.style.display = 'block';
             }
         }
+
+        // Setup event listeners for new UI elements
+        const autoBalanceCheckbox = document.getElementById('auto-balance');
+        if (autoBalanceCheckbox) {
+            autoBalanceCheckbox.addEventListener('change', function() {
+                if (window.ecosim && window.ecosim.ecosystemBalancer) {
+                    // Toggle auto-balance if implemented
+                    console.log('Auto-balance toggled:', this.checked);
+                }
+            });
+        }
+
+        const showDebugCheckbox = document.getElementById('show-debug');
+        if (showDebugCheckbox) {
+            showDebugCheckbox.addEventListener('change', function() {
+                // Toggle debug visualization if implemented
+                console.log('Debug info toggled:', this.checked);
+            });
+        }
+
+        const schemeButtons = document.querySelectorAll('.scheme-button');
+        schemeButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                schemeButtons.forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+                const scheme = this.getAttribute('data-scheme');
+                console.log('Color scheme changed:', scheme);
+                // Apply color scheme if implemented
+            });
+        });
     });
 </script>
 </body>

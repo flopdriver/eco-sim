@@ -28,7 +28,7 @@ body {
 }
 
 .page-container {
-    max-width: 1200px;
+    max-width: 1400px; /* Increased to accommodate three columns */
     margin: 0 auto;
     padding: 0 20px;
 }
@@ -91,10 +91,11 @@ h1::after {
     box-shadow: var(--shadow-sm);
 }
 
+/* Three-column layout for simulation container */
 .simulation-container {
     display: grid;
-    grid-template-columns: 260px 1fr;
-    gap: 20px;
+    grid-template-columns: 220px 1fr 220px; /* Left panel, canvas, right panel */
+    gap: 15px;
     margin: 20px 0;
 }
 
@@ -104,8 +105,10 @@ h1::after {
     box-shadow: var(--shadow-lg);
     overflow: hidden;
     position: relative;
-    min-height: 400px;
+    min-height: 450px;
     transition: transform var(--transition-fast);
+    display: flex;
+    flex-direction: column;
 }
 
 .canvas-container:hover {
@@ -115,16 +118,60 @@ h1::after {
 canvas {
     display: block;
     width: 100%;
-    height: auto;
+    height: 100%;
+    flex-grow: 1;
 }
 
+/* Simulation controls below canvas */
+.sim-controls {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    background-color: rgba(0, 0, 0, 0.7);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sim-controls .button-control {
+    flex-grow: 0;
+    margin: 0 5px;
+    padding: 8px 15px;
+    font-size: 0.9rem;
+}
+
+.sim-controls .slider-control {
+    flex-grow: 1;
+    margin: 0 10px;
+}
+
+.slider-control.horizontal {
+    display: flex;
+    align-items: center;
+}
+
+.slider-control.horizontal label {
+    display: flex;
+    margin: 0 10px 0 0;
+    font-size: 0.85rem;
+}
+
+.slider-control.horizontal input {
+    flex-grow: 1;
+}
+
+/* Panel styling for both sides */
 .controls-panel {
     background-color: white;
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-md);
-    padding: 20px;
+    padding: 15px;
     position: relative;
     z-index: 1;
+    height: fit-content;
+}
+
+.left-panel, .right-panel {
+    max-height: 600px;
+    overflow-y: auto;
 }
 
 .control-group {
@@ -156,10 +203,12 @@ canvas {
     border-radius: 50%;
 }
 
-.control-group:nth-child(1) h3::before { background-color: var(--color-accent); }
-.control-group:nth-child(2) h3::before { background-color: var(--color-plant); }
-.control-group:nth-child(3) h3::before { background-color: var(--color-soil); }
-.control-group:nth-child(4) h3::before { background-color: var(--color-water); }
+/* Different colored dots for each section heading */
+.left-panel .control-group:nth-child(1) h3::before { background-color: var(--color-accent); }
+.left-panel .control-group:nth-child(2) h3::before { background-color: var(--color-plant); }
+.right-panel .control-group:nth-child(1) h3::before { background-color: var(--color-soil); }
+.right-panel .control-group:nth-child(2) h3::before { background-color: var(--color-water); }
+.right-panel .control-group:nth-child(3) h3::before { background-color: #9b59b6; }
 
 .tools, .visualization-modes {
     display: grid;
@@ -172,33 +221,26 @@ canvas {
     grid-template-columns: repeat(2, 1fr);
 }
 
-.tool-button, .viz-button {
+.tool-button, .viz-button, .scheme-button {
     padding: 8px 10px;
     background-color: #f8f9fa;
     border: 1px solid #dee2e6;
     border-radius: var(--radius-sm);
     cursor: pointer;
     text-align: center;
-    font-size: 0.9rem;
+    font-size: 0.7rem;
     font-weight: 500;
     transition: all var(--transition-fast);
     user-select: none;
 }
 
-.tool-button:hover, .viz-button:hover {
+.tool-button:hover, .viz-button:hover, .scheme-button:hover {
     background-color: #e9ecef;
     box-shadow: var(--shadow-sm);
     transform: translateY(-1px);
 }
 
-.tool-button.active {
-    background-color: #e3f2fd;
-    border-color: var(--color-accent);
-    color: var(--color-accent-dark);
-    box-shadow: 0 0 0 1px rgba(52, 152, 219, 0.5);
-}
-
-.viz-button.active {
+.tool-button.active, .viz-button.active, .scheme-button.active {
     background-color: #e3f2fd;
     border-color: var(--color-accent);
     color: var(--color-accent-dark);
@@ -251,6 +293,57 @@ canvas {
 
 .slider-control input::-webkit-slider-thumb:hover {
     transform: scale(1.1);
+}
+
+/* Checkbox styling */
+.checkbox-control {
+    margin: 12px 0;
+}
+
+.checkbox-control label {
+    display: flex;
+    align-items: center;
+    font-size: 0.9rem;
+    color: #495057;
+    cursor: pointer;
+}
+
+.checkbox-control input[type="checkbox"] {
+    margin-right: 8px;
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid #cbd5e0;
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+    position: relative;
+}
+
+.checkbox-control input[type="checkbox"]:checked {
+    background-color: var(--color-accent);
+    border-color: var(--color-accent);
+}
+
+.checkbox-control input[type="checkbox"]:checked::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 6px;
+    width: 5px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+/* Color scheme buttons */
+.color-scheme {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-top: 10px;
 }
 
 .button-control {
@@ -339,6 +432,58 @@ canvas {
     color: var(--color-dark);
 }
 
+.info-card p {
+    margin: 0;
+    color: #495057;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+/* Loading screen */
+.loading-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.85);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    z-index: 100;
+    backdrop-filter: blur(5px);
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid rgba(255, 255, 255, 0.2);
+    border-top: 5px solid var(--color-accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 15px;
+}
+
+.loading-screen p {
+    font-size: 1.1rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    margin-top: 15px;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+}
+
 /* Info section */
 .info-section {
     background-color: white;
@@ -412,124 +557,4 @@ canvas {
     color: var(--color-dark);
     font-size: 1.2rem;
     font-weight: 600;
-}
-
-.info-card p {
-    margin: 0;
-    color: #495057;
-    font-size: 0.95rem;
-    line-height: 1.5;
-}
-
-/* Loading screen */
-.loading-screen {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.85);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    color: white;
-    z-index: 100;
-    backdrop-filter: blur(5px);
-}
-
-.loading-spinner {
-    width: 50px;
-    height: 50px;
-    border: 5px solid rgba(255, 255, 255, 0.2);
-    border-top: 5px solid var(--color-accent);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-bottom: 15px;
-}
-
-.loading-screen p {
-    font-size: 1.1rem;
-    font-weight: 500;
-    letter-spacing: 0.5px;
-    margin-top: 15px;
-    animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 0.7; }
-    50% { opacity: 1; }
-}
-
-/* Footer */
-footer {
-    text-align: center;
-    padding: 20px;
-    margin-top: 40px;
-    color: #6c757d;
-    font-size: 0.9rem;
-    border-top: 1px solid #dee2e6;
-}
-
-footer a {
-    color: var(--color-accent);
-    text-decoration: none;
-}
-
-footer a:hover {
-    text-decoration: underline;
-}
-
-/* Responsive adjustments */
-@media (max-width: 900px) {
-    .simulation-container {
-        grid-template-columns: 1fr;
-    }
-
-    .controls-panel {
-        order: 2;
-    }
-
-    .canvas-container {
-        order: 1;
-    }
-
-    .tools, .visualization-modes {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
-
-@media (max-width: 600px) {
-    h1 {
-        font-size: 2rem;
-    }
-
-    .tools, .visualization-modes {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .info-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .control-group h3 {
-        font-size: 1rem;
-    }
-
-    .info-card {
-        padding: 15px;
-    }
-
-    .info-card h3 {
-        font-size: 1.1rem;
-    }
-
-    .canvas-container {
-        min-height: 300px;
-    }
 }
