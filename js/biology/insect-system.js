@@ -62,7 +62,7 @@ const InsectSystem = {
             this.moveInsect(x, y, index, nextActivePixels, true);
         } else {
             // Enough energy, consider reproduction
-            if (this.core.energy[index] > 150 && Math.random() < 0.02 * this.biology.reproduction) {
+            if (this.core.energy[index] > 200 && Math.random() < 0.02 * this.biology.reproduction) {
                 this.reproduceInsect(x, y, index, nextActivePixels);
             } else {
                 // Otherwise just move randomly

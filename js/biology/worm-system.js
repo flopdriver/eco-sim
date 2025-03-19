@@ -88,7 +88,7 @@ const WormSystem = {
             // Convert dead matter to fertile soil
             this.core.type[neighbor.index] = this.TYPE.SOIL;
             this.core.state[neighbor.index] = this.STATE.FERTILE;
-            this.core.nutrient[neighbor.index] = 30;
+            this.core.nutrient[neighbor.index] = 300;
 
             nextActivePixels.add(neighbor.index);
             return true;

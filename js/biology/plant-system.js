@@ -98,7 +98,7 @@ const PlantSystem = {
 
         // Check soil neighbors for water and nutrients
         for (const neighbor of neighbors) {
-            if (this.core.type[neighbor.index] === this.TYPE.SOIL) {
+            if (this.core.type[neighbor.index] === this.TYPE.SOIL || this.TYPE.AIR || this.TYPE.WATER) {
                 // Extract water if soil has enough
                 if (this.core.water[neighbor.index] > 10) {
                     const extractAmount = Math.min(2, this.core.water[neighbor.index] - 5);
@@ -250,7 +250,7 @@ const PlantSystem = {
     // Update plant stem behavior
     updateStem: function(x, y, index, nextActivePixels) {
         // Stems grow upward and can branch
-        if (this.core.energy[index] > 80 && Math.random() < 0.08 * this.biology.growthRate) {
+        if (this.core.energy[index] > 80 && Math.random() < 0.1 * this.biology.growthRate) {
             this.growStem(x, y, index, nextActivePixels);
         }
 
@@ -267,7 +267,7 @@ const PlantSystem = {
     growStem: function(x, y, index, nextActivePixels) {
         // Stems prefer to grow up, but can grow at angles
         const growthDirections = [
-            {dx: 0, dy: -1, weight: 10},   // Up (highest probability)
+            {dx: 0, dy: -1, weight: 20},   // Up (highest probability)
             {dx: -1, dy: -1, weight: 2},   // Up-left
             {dx: 1, dy: -1, weight: 2}     // Up-right
         ];
@@ -333,8 +333,8 @@ const PlantSystem = {
         const newY = y + dir.dy;
         const newIndex = this.core.getIndex(newX, newY);
 
-        // Can only grow into air
-        if (newIndex !== -1 && this.core.type[newIndex] === this.TYPE.AIR) {
+        // Can only grow into air or water
+        if (newIndex !== -1 && this.core.type[newIndex] === this.TYPE.AIR || this.TYPE.WATER) {
             // Create leaf
             this.core.type[newIndex] = this.TYPE.PLANT;
             this.core.state[newIndex] = this.STATE.LEAF;

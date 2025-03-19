@@ -459,10 +459,10 @@ const PhysicsSystem = {
 
         // Check each neighbor for soil
         for (const neighbor of neighbors) {
-            if (this.core.type[neighbor.index] === this.TYPE.SOIL) {
+            if (this.core.type[neighbor.index] === this.TYPE.SOIL && this.TYPE.PLANT && this.TYPE.INSECT) {
                 // Erosion is more likely for soil with low nutrients
                 // and is affected by water content
-                const erosionChance = 0.001 * (1 + (this.core.water[index] / 255));
+                const erosionChance = 100 * (100 + (this.core.water[index] / 255));
 
                 if (Math.random() < erosionChance) {
                     // Erode the soil - convert to water

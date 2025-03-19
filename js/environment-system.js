@@ -9,7 +9,7 @@ const EnvironmentSystem = {
     dayNightCycle: 0,      // 0-255 representing time of day
     dayLength: 5,          // Length of day cycle (1-10 scale)
     temperature: 128,      // 0-255 representing temperature
-    rainProbability: 0.001, // Chance of rain per tick
+    rainProbability: 0.01, // Chance of rain per tick
 
     // Type and state enums (will be populated by controller)
     TYPE: null,
@@ -72,7 +72,7 @@ const EnvironmentSystem = {
         // Rain appears at the top of the simulation
         for (let x = 0; x < this.core.width; x++) {
             // Not every column gets rain - randomize for natural look
-            if (Math.random() < 0.3) {
+            if (Math.random() < 0.1) {
                 const index = this.core.getIndex(x, 0);
 
                 if (index !== -1 && this.core.type[index] === this.TYPE.AIR) {
