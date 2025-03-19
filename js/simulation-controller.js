@@ -217,6 +217,8 @@ const SimulationController = {
         console.log(`Updated biological rates - Metabolism: ${this.biology.metabolism.toFixed(2)}, Growth: ${this.biology.growthRate.toFixed(2)}, Reproduction: ${this.biology.reproduction.toFixed(2)}`);
     },
 
+    // This is a partial update focusing on the environment initialization part
+
     // Set up the initial environment
     initializeEnvironment: function() {
         console.log("Setting up initial environment...");
@@ -225,7 +227,7 @@ const SimulationController = {
         this.core.type.fill(this.TYPE.AIR);
 
         // Create ground/soil in the bottom portion
-        const groundLevel = Math.floor(this.core.height * 0.4);
+        const groundLevel = Math.floor(this.core.height * 0.6); // Increased to 60% for more soil
 
         for (let y = groundLevel; y < this.core.height; y++) {
             for (let x = 0; x < this.core.width; x++) {
@@ -234,7 +236,7 @@ const SimulationController = {
 
                 // Add variation to soil - some dry, some wet, some fertile
                 const soilRandom = Math.random();
-                if (soilRandom < 0.1) {
+                if (soilRandom < 0.15) { // Increased chance for fertile soil
                     // Fertile soil patches
                     this.core.state[index] = this.STATE.FERTILE;
                     this.core.nutrient[index] = 70 + Math.floor(Math.random() * 50);
@@ -244,8 +246,7 @@ const SimulationController = {
                     this.core.state[index] = depth > 0.3 ? this.STATE.WET : this.STATE.DRY;
 
                     // Water increases with depth
-                    const wetness = Math.floor(depth * 150);
-                    this.core.water[index] = wetness;
+                    this.core.water[index] = Math.floor(depth * 150);
 
                     // Nutrients vary randomly
                     this.core.nutrient[index] = 30 + Math.floor(Math.random() * 40);
@@ -257,7 +258,7 @@ const SimulationController = {
         }
 
         // Add a few varied plant seeds on the surface
-        const numSeeds = 5 + Math.floor(Math.random() * 5); // 5-9 seeds
+        const numSeeds = 8 + Math.floor(Math.random() * 5); // 8-12 seeds
         const seedPositions = new Set();
 
         // Create unique positions for seeds
@@ -273,13 +274,13 @@ const SimulationController = {
 
             if (index !== -1) {
                 this.core.type[index] = this.TYPE.SEED;
-                this.core.energy[index] = 80 + Math.floor(Math.random() * 40); // Varying seed energy
+                this.core.energy[index] = 100 + Math.floor(Math.random() * 40); // Increased seed energy
                 this.activePixels.add(index);
             }
         }
 
         // Add a few initial worms in the soil to help fertility
-        const numWorms = 2 + Math.floor(Math.random() * 3); // 2-4 worms
+        const numWorms = 3 + Math.floor(Math.random() * 3); // 3-5 worms
         for (let i = 0; i < numWorms; i++) {
             const x = Math.floor(Math.random() * this.core.width);
             const y = groundLevel + Math.floor(Math.random() * (this.core.height - groundLevel) * 0.5);
@@ -287,7 +288,7 @@ const SimulationController = {
 
             if (index !== -1 && this.core.type[index] === this.TYPE.SOIL) {
                 this.core.type[index] = this.TYPE.WORM;
-                this.core.energy[index] = 150; // Initial energy
+                this.core.energy[index] = 180; // Increased initial energy
                 this.activePixels.add(index);
             }
         }

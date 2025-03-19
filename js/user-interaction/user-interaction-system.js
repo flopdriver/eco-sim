@@ -64,6 +64,7 @@ window.UserInteractionSystem = {
         const canvasY = (event.clientY - rect.top) * scaleY;
 
         const simX = Math.floor(canvasX / this.core.pixelSize);
+        // Y coordinates remain the same since we fixed the rendering in WebGL
         const simY = Math.floor(canvasY / this.core.pixelSize);
 
         return {

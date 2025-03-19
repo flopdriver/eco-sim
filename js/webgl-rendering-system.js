@@ -143,13 +143,14 @@ window.WebGLRenderingSystem = {
         ]), gl.STATIC_DRAW);
 
         // Create texture coordinate buffer
+        // FIX: Flipped Y coordinates to correct the upside-down rendering
         this.texCoordBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-            0, 0,  // bottom-left
-            1, 0,  // bottom-right
-            0, 1,  // top-left
-            1, 1   // top-right
+            0, 1,  // bottom-left (flipped y)
+            1, 1,  // bottom-right (flipped y)
+            0, 0,  // top-left (flipped y)
+            1, 0   // top-right (flipped y)
         ]), gl.STATIC_DRAW);
     },
 
