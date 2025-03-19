@@ -29,6 +29,9 @@ const WebGLRenderingSystem = {
     canvas: null,
     gl: null,
 
+    // Reference to core simulation
+    core: null,
+
     // Program and locations
     program: null,
     positionLocation: null,
@@ -41,6 +44,40 @@ const WebGLRenderingSystem = {
     // Textures
     texture: null,
     textureData: null,
+
+    // Type and state enums (will be populated by controller)
+    TYPE: null,
+    STATE: null,
+
+    // Visualization mode
+    visualizationMode: 'normal', // normal, moisture, energy, nutrient
+
+    // Color palettes for different visualization modes
+    colorPalettes: {
+        // For moisture visualization (blue gradient)
+        moisture: [
+            { level: 0, color: { r: 230, g: 230, b: 250 } },   // Dry - light lavender
+            { level: 50, color: { r: 135, g: 206, b: 250 } },  // Low moisture - light blue
+            { level: 100, color: { r: 30, g: 144, b: 255 } },  // Medium moisture - dodger blue
+            { level: 200, color: { r: 0, g: 0, b: 139 } }      // High moisture - dark blue
+        ],
+
+        // For energy visualization (yellow/orange/red gradient)
+        energy: [
+            { level: 0, color: { r: 255, g: 250, b: 205 } },   // Low energy - light yellow
+            { level: 50, color: { r: 255, g: 215, b: 0 } },    // Medium energy - gold
+            { level: 150, color: { r: 255, g: 140, b: 0 } },   // High energy - dark orange
+            { level: 250, color: { r: 255, g: 0, b: 0 } }      // Max energy - red
+        ],
+
+        // For nutrient visualization (green gradient)
+        nutrient: [
+            { level: 0, color: { r: 245, g: 245, b: 220 } },   // Low nutrients - beige
+            { level: 50, color: { r: 173, g: 255, b: 47 } },   // Some nutrients - green yellow
+            { level: 100, color: { r: 34, g: 139, b: 34 } },   // Medium nutrients - forest green
+            { level: 200, color: { r: 0, g: 100, b: 0 } }      // High nutrients - dark green
+        ]
+    },
 
     init: function(core, canvasId) {
         this.core = core;
@@ -121,9 +158,9 @@ const WebGLRenderingSystem = {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
             -1, -1,  // bottom-left
-            1, -1,  // bottom-right
+            1, -1,   // bottom-right
             -1,  1,  // top-left
-            1,  1   // top-right
+            1,  1    // top-right
         ]), gl.STATIC_DRAW);
 
         // Create texture coordinate buffer
@@ -164,6 +201,16 @@ const WebGLRenderingSystem = {
         );
     },
 
+    // Set visualization mode
+    setVisualizationMode: function(mode) {
+        if (['normal', 'moisture', 'energy', 'nutrient'].includes(mode)) {
+            this.visualizationMode = mode;
+            console.log("Visualization mode set to:", mode);
+        } else {
+            console.warn("Unknown visualization mode:", mode);
+        }
+    },
+
     // Update texture with current simulation state
     updateTexture: function() {
         const gl = this.gl;
@@ -174,7 +221,7 @@ const WebGLRenderingSystem = {
                 const index = y * this.core.width + x;
                 const texIndex = index * 4;
 
-                // Get color based on pixel properties
+                // Get color based on pixel properties and current visualization mode
                 const color = this.getPixelColor(index);
 
                 // Set RGBA values in texture data
@@ -226,51 +273,208 @@ const WebGLRenderingSystem = {
 
         // Draw the quad (2 triangles, 6 vertices)
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-        // Draw UI on top of the WebGL canvas
-        this.drawUI();
     },
 
-    // Get color for a pixel based on its properties
+    // Get color for a pixel based on its properties and current visualization mode
     getPixelColor: function(index) {
+        // Handle specialized visualization modes first
+        if (this.visualizationMode !== 'normal') {
+            return this.getSpecializedVisualizationColor(index);
+        }
+
+        // Get pixel properties
         const type = this.core.type[index];
         const state = this.core.state[index];
         const water = this.core.water[index];
         const energy = this.core.energy[index];
+        const nutrient = this.core.nutrient[index];
 
-        // Default colors (to be implemented based on pixel properties)
-        // This is a placeholder - you'll need to define how different types of pixels
-        // should be colored based on your TYPE and STATE enums
+        // Default colors
         let r = 0, g = 0, b = 0;
 
-        // Simple placeholder coloring based on type
+        // Normal mode - color based on type and state
         switch (type) {
-            case 0: // AIR
-                r = g = b = 200;  // Light gray
+            case this.TYPE.AIR:
+                // Air color varies slightly with energy (sunlight)
+                const lightLevel = Math.min(1.0, energy / 100);
+                r = 120 + Math.floor(lightLevel * 135);
+                g = 170 + Math.floor(lightLevel * 85);
+                b = 225 + Math.floor(lightLevel * 30);
                 break;
-            case 1: // WATER
-                r = 20; g = 50; b = 200;  // Blue
+
+            case this.TYPE.WATER:
+                // Water color varies with nutrient content and depth perception
+                r = 20 + Math.floor(nutrient * 0.2); // Redder with nutrients
+                g = 80 + Math.floor(nutrient * 0.1);
+                b = 200 - Math.floor(nutrient * 0.2); // Less blue with nutrients
                 break;
-            case 2: // SOIL
-                r = 120; g = 80; b = 40;  // Brown
+
+            case this.TYPE.SOIL:
+                // Soil color varies with state and water content
+                switch (state) {
+                    case this.STATE.DRY:
+                        r = 150 - Math.floor(water * 0.2);
+                        g = 100 - Math.floor(water * 0.1);
+                        b = 60 - Math.floor(water * 0.1);
+                        break;
+                    case this.STATE.WET:
+                        r = 110 - Math.floor(water * 0.1);
+                        g = 70 - Math.floor(water * 0.05);
+                        b = 40;
+                        break;
+                    case this.STATE.FERTILE:
+                        r = 100 - Math.floor(nutrient * 0.1);
+                        g = 80 + Math.floor(nutrient * 0.2);
+                        b = 40;
+                        break;
+                    default:
+                        r = 120; g = 80; b = 40; // Default brown
+                }
                 break;
-            case 3: // PLANT
-                r = 40; g = 180; b = 40;  // Green
+
+            case this.TYPE.PLANT:
+                // Different plant parts have different colors
+                switch (state) {
+                    case this.STATE.ROOT:
+                        r = 180 - Math.floor(water * 0.3);
+                        g = 120 + Math.floor(water * 0.2);
+                        b = 60;
+                        break;
+                    case this.STATE.STEM:
+                        r = 60 + Math.floor(energy * 0.1);
+                        g = 160 + Math.floor(energy * 0.2);
+                        b = 60;
+                        break;
+                    case this.STATE.LEAF:
+                        // Leaves get greener with energy (photosynthesis)
+                        r = 20 + Math.floor(water * 0.1);
+                        g = 150 + Math.floor(energy * 0.4);
+                        b = 20 + Math.floor(water * 0.1);
+                        break;
+                    case this.STATE.FLOWER:
+                        // Flowers are colorful - using energy to determine color
+                        const colorPhase = (energy % 100) / 100;
+                        // Create rainbow effect
+                        if (colorPhase < 0.33) {
+                            r = 255; g = Math.floor(colorPhase * 3 * 255); b = 0;
+                        } else if (colorPhase < 0.66) {
+                            r = Math.floor((0.66 - colorPhase) * 3 * 255); g = 255; b = Math.floor((colorPhase - 0.33) * 3 * 255);
+                        } else {
+                            r = Math.floor((colorPhase - 0.66) * 3 * 255); g = Math.floor((1.0 - colorPhase) * 3 * 255); b = 255;
+                        }
+                        break;
+                    default:
+                        r = 40; g = 180; b = 40; // Default green
+                }
                 break;
-            case 4: // INSECT
-                r = 200; g = 50; b = 50;  // Red
+
+            case this.TYPE.INSECT:
+                // Insects are reddish or orangish, color varies with energy
+                r = 200 + Math.floor(energy * 0.2);
+                g = 50 + Math.floor(energy * 0.4);
+                b = 20 + Math.floor(energy * 0.1);
                 break;
+
+            case this.TYPE.SEED:
+                // Seeds are small brown dots
+                r = 160 + Math.floor(energy * 0.1);
+                g = 140 - Math.floor(energy * 0.1);
+                b = 40;
+                break;
+
+            case this.TYPE.DEAD_MATTER:
+                // Dead matter - grayish brown
+                r = 120 - Math.floor(water * 0.2);
+                g = 100 - Math.floor(water * 0.2);
+                b = 80 - Math.floor(water * 0.1);
+                break;
+
+            case this.TYPE.WORM:
+                // Worms are pinkish
+                r = 220 - Math.floor(energy * 0.1);
+                g = 150 - Math.floor(energy * 0.1);
+                b = 150 - Math.floor(energy * 0.1);
+                break;
+
             default:
-                r = g = b = 128;  // Gray for unknown
+                // Unknown type - gray
+                r = g = b = 128;
         }
 
-        return { r, g, b };
+        // Ensure RGB values are in valid range
+        return {
+            r: Math.max(0, Math.min(255, Math.floor(r))),
+            g: Math.max(0, Math.min(255, Math.floor(g))),
+            b: Math.max(0, Math.min(255, Math.floor(b)))
+        };
     },
 
-    // Draw UI elements on top of the WebGL canvas
-    drawUI: function() {
-        // We'll implement this later - possibly with HTML overlays or a second canvas
-        // For now, this is a placeholder
+    // Get color for specialized visualization modes (moisture, energy, nutrient)
+    getSpecializedVisualizationColor: function(index) {
+        // Get the relevant property based on visualization mode
+        let value = 0;
+        let palette = null;
+
+        switch (this.visualizationMode) {
+            case 'moisture':
+                value = this.core.water[index];
+                palette = this.colorPalettes.moisture;
+                break;
+            case 'energy':
+                value = this.core.energy[index];
+                palette = this.colorPalettes.energy;
+                break;
+            case 'nutrient':
+                value = this.core.nutrient[index];
+                palette = this.colorPalettes.nutrient;
+                break;
+            default:
+                return { r: 0, g: 0, b: 0 }; // Black for unknown mode
+        }
+
+        // Special case for air - always show as very transparent in special modes
+        if (this.core.type[index] === this.TYPE.AIR) {
+            return { r: 240, g: 240, b: 240 };
+        }
+
+        // Interpolate between colors based on value
+        return this.interpolateColor(value, palette);
+    },
+
+    // Interpolate between colors in a palette based on a value
+    interpolateColor: function(value, palette) {
+        // Find the two colors to interpolate between
+        let lowerColor = palette[0].color;
+        let upperColor = palette[palette.length - 1].color;
+        let lowerLevel = palette[0].level;
+        let upperLevel = palette[palette.length - 1].level;
+
+        for (let i = 0; i < palette.length - 1; i++) {
+            if (value >= palette[i].level && value <= palette[i+1].level) {
+                lowerColor = palette[i].color;
+                upperColor = palette[i+1].color;
+                lowerLevel = palette[i].level;
+                upperLevel = palette[i+1].level;
+                break;
+            }
+        }
+
+        // Calculate interpolation factor (0-1)
+        const range = upperLevel - lowerLevel;
+        const factor = range === 0 ? 0 : (value - lowerLevel) / range;
+
+        // Interpolate RGB values
+        return {
+            r: Math.floor(lowerColor.r + factor * (upperColor.r - lowerColor.r)),
+            g: Math.floor(lowerColor.g + factor * (upperColor.g - lowerColor.g)),
+            b: Math.floor(lowerColor.b + factor * (upperColor.b - lowerColor.b))
+        };
+    },
+
+    // Add debug information to the scene (e.g., highlight active pixels)
+    drawDebugInfo: function() {
+        // This would be implemented if using a second canvas overlay for debugging
+        // For now, this is a placeholder for future implementation
     },
 
     // Resize the WebGL canvas and viewport
