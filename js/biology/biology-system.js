@@ -1,0 +1,63 @@
+// Biology System
+// Handles all organism behaviors: plants, insects, worms, and decomposition
+
+const BiologySystem = {
+    // Reference to core simulation
+    core: null,
+
+    // Type and state enums (will be populated by controller)
+    TYPE: null,
+    STATE: null,
+
+    // Biology settings
+    growthRate: 1.0,        // Multiplier for organism growth rates
+    metabolism: 1.0,        // Energy consumption rate multiplier
+    reproduction: 1.0,      // Reproduction probability multiplier
+
+    // Processing flags to avoid double updates
+    processedThisFrame: null,
+
+    // References to subsystems
+    plantSystem: null,
+    seedSystem: null,
+    insectSystem: null,
+    wormSystem: null,
+    decompositionSystem: null,
+
+    // Initialize biology system
+    init: function(core) {
+        this.core = core;
+        console.log("Initializing biology systems...");
+
+        // Create processed flags array
+        this.processedThisFrame = new Uint8Array(core.size);
+
+        // Initialize subsystems
+        this.plantSystem = PlantSystem.init(this);
+        this.seedSystem = SeedSystem.init(this);
+        this.insectSystem = InsectSystem.init(this);
+        this.wormSystem = WormSystem.init(this);
+        this.decompositionSystem = DecompositionSystem.init(this);
+
+        return this;
+    },
+
+    // Main update function
+    update: function(activePixels, nextActivePixels) {
+        // Reset processed flags
+        this.processedThisFrame.fill(0);
+
+        // Process plants first (plants don't move, so all active plant pixels can be processed)
+        this.plantSystem.update(activePixels, nextActivePixels);
+
+        // Process seeds
+        this.seedSystem.update(activePixels, nextActivePixels);
+
+        // Process mobile organisms (insects, worms)
+        this.insectSystem.update(activePixels, nextActivePixels);
+        this.wormSystem.update(activePixels, nextActivePixels);
+
+        // Process decomposition (dead matter)
+        this.decompositionSystem.update(activePixels, nextActivePixels);
+    }
+};
