@@ -5,7 +5,7 @@ const CoreSimulation = {
     // Grid dimensions and settings
     width: 400,
     height: 300,
-    pixelSize: 2,
+    pixelSize: 3,
     size: 0, // Will be calculated as width * height
 
     // Type and state enums (will be populated by controller)
