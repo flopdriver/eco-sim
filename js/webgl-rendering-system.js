@@ -54,28 +54,28 @@ window.WebGLRenderingSystem = {
 
     // Color palettes for different visualization modes
     colorPalettes: {
-        // For moisture visualization (blue gradient)
+        // For moisture visualization (blue gradient) - more natural blues
         moisture: [
-            { level: 0, color: { r: 230, g: 230, b: 250 } },   // Dry - light lavender
-            { level: 50, color: { r: 135, g: 206, b: 250 } },  // Low moisture - light blue
-            { level: 100, color: { r: 30, g: 144, b: 255 } },  // Medium moisture - dodger blue
-            { level: 200, color: { r: 0, g: 0, b: 139 } }      // High moisture - dark blue
+            { level: 0, color: { r: 240, g: 240, b: 250 } },   // Dry - very pale blue
+            { level: 50, color: { r: 176, g: 196, b: 222 } },  // Low moisture - light steel blue
+            { level: 100, color: { r: 70, g: 130, b: 180 } },  // Medium moisture - steel blue
+            { level: 200, color: { r: 25, g: 25, b: 112 } }    // High moisture - midnight blue
         ],
 
-        // For energy visualization (yellow/orange/red gradient)
+        // For energy visualization (yellow/orange/red gradient) - more earthy tones
         energy: [
-            { level: 0, color: { r: 255, g: 250, b: 205 } },   // Low energy - light yellow
-            { level: 50, color: { r: 255, g: 215, b: 0 } },    // Medium energy - gold
-            { level: 150, color: { r: 255, g: 140, b: 0 } },   // High energy - dark orange
-            { level: 250, color: { r: 255, g: 0, b: 0 } }      // Max energy - red
+            { level: 0, color: { r: 245, g: 245, b: 220 } },   // Low energy - beige
+            { level: 50, color: { r: 210, g: 180, b: 140 } },  // Medium energy - tan
+            { level: 150, color: { r: 205, g: 133, b: 63 } },  // High energy - peru
+            { level: 250, color: { r: 165, g: 42, b: 42 } }    // Max energy - brown
         ],
 
-        // For nutrient visualization (green gradient)
+        // For nutrient visualization (green gradient) - more natural greens
         nutrient: [
-            { level: 0, color: { r: 245, g: 245, b: 220 } },   // Low nutrients - beige
-            { level: 50, color: { r: 173, g: 255, b: 47 } },   // Some nutrients - green yellow
-            { level: 100, color: { r: 34, g: 139, b: 34 } },   // Medium nutrients - forest green
-            { level: 200, color: { r: 0, g: 100, b: 0 } }      // High nutrients - dark green
+            { level: 0, color: { r: 240, g: 240, b: 230 } },   // Low nutrients - cream
+            { level: 50, color: { r: 144, g: 238, b: 144 } },  // Some nutrients - light green
+            { level: 100, color: { r: 60, g: 179, b: 113 } },  // Medium nutrients - medium sea green
+            { level: 200, color: { r: 34, g: 139, b: 34 } }    // High nutrients - forest green
         ]
     },
 
@@ -275,110 +275,153 @@ window.WebGLRenderingSystem = {
         // Normal mode - color based on type and state
         switch (type) {
             case this.TYPE.AIR:
-                // Air color varies slightly with energy (sunlight)
-                const lightLevel = Math.min(1.0, energy / 100);
-                r = 120 + Math.floor(lightLevel * 135);
-                g = 170 + Math.floor(lightLevel * 85);
-                b = 225 + Math.floor(lightLevel * 30);
+                // Air color varies slightly with energy (sunlight) - softer blue
+                const lightLevel = Math.min(1.0, energy / 150);
+                // More subtle sky blue with day/night influence
+                r = 140 + Math.floor(lightLevel * 70);
+                g = 180 + Math.floor(lightLevel * 40);
+                b = 230 + Math.floor(lightLevel * 20);
+                // Add slight variation for more natural look
+                r += Math.floor(Math.random() * 10) - 5;
+                g += Math.floor(Math.random() * 10) - 5;
+                b += Math.floor(Math.random() * 10) - 5;
                 break;
 
             case this.TYPE.WATER:
-                // Water color varies with nutrient content and depth perception
-                r = 20 + Math.floor(nutrient * 0.2); // Redder with nutrients
-                g = 80 + Math.floor(nutrient * 0.1);
-                b = 200 - Math.floor(nutrient * 0.2); // Less blue with nutrients
+                // Water color - more natural blue with subtle variation
+                r = 35 + Math.floor(nutrient * 0.1); // Slight reddish with nutrients
+                g = 110 + Math.floor(nutrient * 0.05) - Math.floor(Math.random() * 15);
+                b = 185 - Math.floor(nutrient * 0.1) + Math.floor(Math.random() * 15);
+                // Darker in deeper water
+                const coords = this.core.getCoords(index);
+                if (coords) {
+                    const depth = coords.y / this.core.height;
+                    r = Math.max(10, r - Math.floor(depth * 20));
+                    g = Math.max(70, g - Math.floor(depth * 30));
+                    b = Math.max(140, b - Math.floor(depth * 20));
+                }
                 break;
 
             case this.TYPE.SOIL:
-                // Soil color varies with state and water content
+                // Soil color - more natural earth tones with variation
                 switch (state) {
                     case this.STATE.DRY:
-                        r = 150 - Math.floor(water * 0.2);
-                        g = 100 - Math.floor(water * 0.1);
-                        b = 60 - Math.floor(water * 0.1);
+                        // Dry soil - sandy, light brown with variation
+                        r = 150 - Math.floor(water * 0.15) + Math.floor(Math.random() * 15) - 7;
+                        g = 120 - Math.floor(water * 0.1) + Math.floor(Math.random() * 15) - 7;
+                        b = 90 - Math.floor(water * 0.05) + Math.floor(Math.random() * 10) - 5;
                         break;
                     case this.STATE.WET:
-                        r = 110 - Math.floor(water * 0.1);
-                        g = 70 - Math.floor(water * 0.05);
-                        b = 40;
+                        // Wet soil - darker brown with variation
+                        r = 100 - Math.floor(water * 0.1) + Math.floor(Math.random() * 10) - 5;
+                        g = 65 - Math.floor(water * 0.05) + Math.floor(Math.random() * 10) - 5;
+                        b = 40 + Math.floor(Math.random() * 10) - 5;
                         break;
                     case this.STATE.FERTILE:
-                        r = 100 - Math.floor(nutrient * 0.1);
-                        g = 80 + Math.floor(nutrient * 0.2);
-                        b = 40;
+                        // Fertile soil - rich darker brown with variation
+                        r = 110 - Math.floor(nutrient * 0.05) + Math.floor(Math.random() * 10) - 5;
+                        g = 75 + Math.floor(nutrient * 0.1) + Math.floor(Math.random() * 10) - 5;
+                        b = 50 + Math.floor(Math.random() * 8) - 4;
                         break;
                     default:
-                        r = 120; g = 80; b = 40; // Default brown
+                        // Default brown with variation
+                        r = 120 + Math.floor(Math.random() * 15) - 7;
+                        g = 85 + Math.floor(Math.random() * 10) - 5;
+                        b = 55 + Math.floor(Math.random() * 10) - 5;
                 }
                 break;
 
             case this.TYPE.PLANT:
-                // Different plant parts have different colors
+                // Different plant parts have different colors - more natural greens
                 switch (state) {
                     case this.STATE.ROOT:
-                        r = 180 - Math.floor(water * 0.3);
-                        g = 120 + Math.floor(water * 0.2);
-                        b = 60;
+                        // Roots - more natural brownish with water influence
+                        r = 140 - Math.floor(water * 0.2) + Math.floor(Math.random() * 10) - 5;
+                        g = 100 + Math.floor(water * 0.1) + Math.floor(Math.random() * 10) - 5;
+                        b = 60 + Math.floor(Math.random() * 8) - 4;
                         break;
                     case this.STATE.STEM:
-                        r = 60 + Math.floor(energy * 0.1);
-                        g = 160 + Math.floor(energy * 0.2);
-                        b = 60;
+                        // Stems - natural green-brown
+                        r = 80 + Math.floor(energy * 0.05) + Math.floor(Math.random() * 10) - 5;
+                        g = 120 + Math.floor(energy * 0.1) + Math.floor(Math.random() * 15) - 7;
+                        b = 50 + Math.floor(Math.random() * 10) - 5;
                         break;
                     case this.STATE.LEAF:
-                        // Leaves get greener with energy (photosynthesis)
-                        r = 20 + Math.floor(water * 0.1);
-                        g = 150 + Math.floor(energy * 0.4);
-                        b = 20 + Math.floor(water * 0.1);
+                        // Leaves - more natural muted green with variation
+                        // Use both energy and water to influence color
+                        const energyFactor = Math.min(1.0, energy / 200);
+                        const waterFactor = Math.min(1.0, water / 200);
+
+                        // Base green color
+                        r = 40 + Math.floor(waterFactor * 20) + Math.floor(Math.random() * 15) - 7;
+                        g = 100 + Math.floor(energyFactor * 40) + Math.floor(Math.random() * 20) - 10;
+                        b = 30 + Math.floor(waterFactor * 20) + Math.floor(Math.random() * 10) - 5;
+
+                        // Age variation - older leaves turn more yellow
+                        if (Math.random() < 0.2) {
+                            r += 20;
+                            g -= 10;
+                        }
                         break;
                     case this.STATE.FLOWER:
-                        // Flowers are colorful - using energy to determine color
-                        const colorPhase = (energy % 100) / 100;
-                        // Create rainbow effect
-                        if (colorPhase < 0.33) {
-                            r = 255; g = Math.floor(colorPhase * 3 * 255); b = 0;
-                        } else if (colorPhase < 0.66) {
-                            r = Math.floor((0.66 - colorPhase) * 3 * 255); g = 255; b = Math.floor((colorPhase - 0.33) * 3 * 255);
+                        // Flowers with more natural color variation
+                        if (Math.random() < 0.3) {
+                            // White/pale flowers
+                            r = 240 + Math.floor(Math.random() * 15);
+                            g = 240 + Math.floor(Math.random() * 15);
+                            b = 220 + Math.floor(Math.random() * 35);
+                        } else if (Math.random() < 0.5) {
+                            // Yellow/orange flowers
+                            r = 220 + Math.floor(Math.random() * 35);
+                            g = 180 + Math.floor(Math.random() * 75);
+                            b = 50 + Math.floor(Math.random() * 30);
                         } else {
-                            r = Math.floor((colorPhase - 0.66) * 3 * 255); g = Math.floor((1.0 - colorPhase) * 3 * 255); b = 255;
+                            // Pink/purple flowers
+                            r = 180 + Math.floor(Math.random() * 75);
+                            g = 100 + Math.floor(Math.random() * 40);
+                            b = 150 + Math.floor(Math.random() * 105);
                         }
                         break;
                     default:
-                        r = 40; g = 180; b = 40; // Default green
+                        // Default green with variation
+                        r = 60 + Math.floor(Math.random() * 20) - 10;
+                        g = 120 + Math.floor(Math.random() * 30) - 15;
+                        b = 50 + Math.floor(Math.random() * 20) - 10;
                 }
                 break;
 
             case this.TYPE.INSECT:
-                // Insects are reddish or orangish, color varies with energy
-                r = 200 + Math.floor(energy * 0.2);
-                g = 50 + Math.floor(energy * 0.4);
-                b = 20 + Math.floor(energy * 0.1);
+                // Insects - more natural reddish-brown
+                const insectEnergy = Math.min(1.0, energy / 200);
+                r = 150 + Math.floor(insectEnergy * 40) + Math.floor(Math.random() * 20) - 10;
+                g = 80 + Math.floor(insectEnergy * 20) + Math.floor(Math.random() * 15) - 7;
+                b = 40 + Math.floor(insectEnergy * 10) + Math.floor(Math.random() * 15) - 7;
                 break;
 
             case this.TYPE.SEED:
-                // Seeds are small brown dots
-                r = 160 + Math.floor(energy * 0.1);
-                g = 140 - Math.floor(energy * 0.1);
-                b = 40;
+                // Seeds - natural brown with variation
+                r = 120 + Math.floor(energy * 0.1) + Math.floor(Math.random() * 15) - 7;
+                g = 100 - Math.floor(energy * 0.05) + Math.floor(Math.random() * 15) - 7;
+                b = 60 + Math.floor(Math.random() * 10) - 5;
                 break;
 
             case this.TYPE.DEAD_MATTER:
-                // Dead matter - grayish brown
-                r = 120 - Math.floor(water * 0.2);
-                g = 100 - Math.floor(water * 0.2);
-                b = 80 - Math.floor(water * 0.1);
+                // Dead matter - grayish brown with variation
+                r = 100 - Math.floor(water * 0.1) + Math.floor(Math.random() * 15) - 7;
+                g = 90 - Math.floor(water * 0.1) + Math.floor(Math.random() * 15) - 7;
+                b = 70 - Math.floor(water * 0.05) + Math.floor(Math.random() * 10) - 5;
                 break;
 
             case this.TYPE.WORM:
-                // Worms are pinkish
-                r = 220 - Math.floor(energy * 0.1);
-                g = 150 - Math.floor(energy * 0.1);
-                b = 150 - Math.floor(energy * 0.1);
+                // Worms - pinkish-brown with variation
+                r = 180 - Math.floor(energy * 0.05) + Math.floor(Math.random() * 15) - 7;
+                g = 130 - Math.floor(energy * 0.05) + Math.floor(Math.random() * 15) - 7;
+                b = 130 - Math.floor(energy * 0.05) + Math.floor(Math.random() * 10) - 5;
                 break;
 
             default:
-                // Unknown type - gray
-                r = g = b = 128;
+                // Unknown type - gray with variation
+                r = g = b = 120 + Math.floor(Math.random() * 20) - 10;
         }
 
         // Ensure RGB values are in valid range
@@ -414,11 +457,20 @@ window.WebGLRenderingSystem = {
 
         // Special case for air - always show as very transparent in special modes
         if (this.core.type[index] === this.TYPE.AIR) {
-            return { r: 240, g: 240, b: 240 };
+            // Add slight variation for more natural look
+            const variation = Math.floor(Math.random() * 10) - 5;
+            return { r: 235 + variation, g: 235 + variation, b: 235 + variation };
         }
 
         // Interpolate between colors based on value
-        return this.interpolateColor(value, palette);
+        const baseColor = this.interpolateColor(value, palette);
+
+        // Add small random variation for more natural appearance
+        return {
+            r: Math.max(0, Math.min(255, baseColor.r + Math.floor(Math.random() * 10) - 5)),
+            g: Math.max(0, Math.min(255, baseColor.g + Math.floor(Math.random() * 10) - 5)),
+            b: Math.max(0, Math.min(255, baseColor.b + Math.floor(Math.random() * 10) - 5))
+        };
     },
 
     // Interpolate between colors in a palette based on a value
