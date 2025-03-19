@@ -26,7 +26,7 @@ const SystemManager = {
         this.controller.core.STATE = this.controller.STATE;
 
         // 2. Environment system (depends on core)
-        this.controller.environment = EnvironmentSystem.init(this.controller.core);
+        this.controller.environment = EnvironmentController.init(this.controller.core);
         if (!this.controller.environment) {
             console.error("Failed to initialize environment system.");
             return false;
