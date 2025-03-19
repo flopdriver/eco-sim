@@ -39,6 +39,9 @@ const BiologySystem = {
         this.wormSystem = WormSystem.init(this);
         this.decompositionSystem = DecompositionSystem.init(this);
 
+        // Ensure constants are propagated to subsystems
+        this.propagateConstants();
+
         return this;
     },
 
@@ -59,5 +62,31 @@ const BiologySystem = {
 
         // Process decomposition (dead matter)
         this.decompositionSystem.update(activePixels, nextActivePixels);
-    }
+    },
+
+    propagateConstants: function() {
+        console.log("Propagating constants to biology subsystems...");
+
+        // Ensure TYPE and STATE are set in all subsystems
+        if (this.plantSystem) {
+            this.plantSystem.TYPE = this.TYPE;
+            this.plantSystem.STATE = this.STATE;
+        }
+        if (this.seedSystem) {
+            this.seedSystem.TYPE = this.TYPE;
+            this.seedSystem.STATE = this.STATE;
+        }
+        if (this.insectSystem) {
+            this.insectSystem.TYPE = this.TYPE;
+            this.insectSystem.STATE = this.STATE;
+        }
+        if (this.wormSystem) {
+            this.wormSystem.TYPE = this.TYPE;
+            this.wormSystem.STATE = this.STATE;
+        }
+        if (this.decompositionSystem) {
+            this.decompositionSystem.TYPE = this.TYPE;
+            this.decompositionSystem.STATE = this.STATE;
+        }
+    },
 };

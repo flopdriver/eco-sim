@@ -46,6 +46,9 @@ const SimulationController = {
         // Set up constants (pixel types, states)
         this.initializeConstants();
 
+        // Propagate constants to all subsystems
+        this.propagateConstants();
+
         // Set up initial environment
         this.initializeEnvironment();
 
@@ -655,7 +658,51 @@ const SimulationController = {
             [array[i], array[j]] = [array[j], array[i]];
         }
         return array;
-    }
+    },
+
+    propagateConstants: function() {
+        console.log("Propagating constants to subsystems...");
+
+        // User interaction subsystems
+        if (this.userInteraction) {
+            if (this.userInteraction.toolSystem) {
+                this.userInteraction.toolSystem.TYPE = this.TYPE;
+                this.userInteraction.toolSystem.STATE = this.STATE;
+            }
+            if (this.userInteraction.eventHandlerSystem) {
+                this.userInteraction.eventHandlerSystem.TYPE = this.TYPE;
+                this.userInteraction.eventHandlerSystem.STATE = this.STATE;
+            }
+            if (this.userInteraction.visualizationSystem) {
+                this.userInteraction.visualizationSystem.TYPE = this.TYPE;
+                this.userInteraction.visualizationSystem.STATE = this.STATE;
+            }
+        }
+
+        // Biology subsystems
+        if (this.biology) {
+            if (this.biology.plantSystem) {
+                this.biology.plantSystem.TYPE = this.TYPE;
+                this.biology.plantSystem.STATE = this.STATE;
+            }
+            if (this.biology.seedSystem) {
+                this.biology.seedSystem.TYPE = this.TYPE;
+                this.biology.seedSystem.STATE = this.STATE;
+            }
+            if (this.biology.insectSystem) {
+                this.biology.insectSystem.TYPE = this.TYPE;
+                this.biology.insectSystem.STATE = this.STATE;
+            }
+            if (this.biology.wormSystem) {
+                this.biology.wormSystem.TYPE = this.TYPE;
+                this.biology.wormSystem.STATE = this.STATE;
+            }
+            if (this.biology.decompositionSystem) {
+                this.biology.decompositionSystem.TYPE = this.TYPE;
+                this.biology.decompositionSystem.STATE = this.STATE;
+            }
+        }
+    },
 };
 
 // Initialize and start the simulation when the page loads
