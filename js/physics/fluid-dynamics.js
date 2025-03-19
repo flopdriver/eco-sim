@@ -83,6 +83,65 @@ const FluidDynamicsSystem = {
                         return;
                     }
                     break;
+
+                case this.physics.TYPE.PLANT:
+                    // Allow water to pass through plants with some probability
+                    // Different probabilities for different plant parts
+                    let passChance = 0.1; // Base chance
+
+                    // Adjust based on plant state (root, stem, leaf, etc.)
+                    switch (this.physics.core.state[downIndex]) {
+                        case this.physics.STATE.ROOT:
+                            passChance = 0.3; // Roots absorb water, but also let it pass
+                            break;
+                        case this.physics.STATE.STEM:
+                            passChance = 0.2; // Stems let some water pass
+                            break;
+                        case this.physics.STATE.LEAF:
+                            passChance = 0.05; // Leaves block most water
+                            break;
+                        default:
+                            passChance = 0.1;
+                    }
+
+                    if (Math.random() < passChance) {
+                        // Water passes through the plant
+                        this.swapWaterWithElement(index, downIndex, nextActivePixels);
+                        return;
+                    }
+                    break;
+
+                case this.physics.TYPE.INSECT:
+                    // Allow water to pass through insects with small probability
+                    if (Math.random() < 0.15) {
+                        this.swapWaterWithElement(index, downIndex, nextActivePixels);
+                        return;
+                    }
+                    break;
+
+                case this.physics.TYPE.WORM:
+                    // Worms are more permeable to water
+                    if (Math.random() < 0.25) {
+                        this.swapWaterWithElement(index, downIndex, nextActivePixels);
+                        return;
+                    }
+                    break;
+
+                case this.physics.TYPE.SEED:
+                    // Seeds can let water pass occasionally
+                    if (Math.random() < 0.2) {
+                        this.swapWaterWithElement(index, downIndex, nextActivePixels);
+                        return;
+                    }
+                    break;
+
+                case this.physics.TYPE.DEAD_MATTER:
+                    // Dead matter is somewhat permeable
+                    if (Math.random() < 0.3) {
+                        this.swapWaterWithElement(index, downIndex, nextActivePixels);
+                        return;
+                    }
+                    break;
             }
         }
 
@@ -117,6 +176,38 @@ const FluidDynamicsSystem = {
 
         // If still here, water couldn't move, but remains active
         nextActivePixels.add(index);
+    },
+
+    // Helper method to swap water with another element
+    swapWaterWithElement: function(waterIndex, elementIndex, nextActivePixels) {
+        // Store the element's properties
+        const elementType = this.physics.core.type[elementIndex];
+        const elementState = this.physics.core.state[elementIndex];
+        const elementWater = this.physics.core.water[elementIndex];
+        const elementNutrient = this.physics.core.nutrient[elementIndex];
+        const elementEnergy = this.physics.core.energy[elementIndex];
+        const elementMetadata = this.physics.core.metadata[elementIndex];
+
+        // Move water down
+        this.physics.core.type[elementIndex] = this.physics.TYPE.WATER;
+        this.physics.core.water[elementIndex] = this.physics.core.water[waterIndex];
+        this.physics.core.state[elementIndex] = this.physics.STATE.DEFAULT;
+        this.physics.core.nutrient[elementIndex] = 0;
+        this.physics.core.energy[elementIndex] = 0;
+        this.physics.core.metadata[elementIndex] = 0;
+
+        // Move element up
+        this.physics.core.type[waterIndex] = elementType;
+        this.physics.core.state[waterIndex] = elementState;
+        this.physics.core.water[waterIndex] = elementWater;
+        this.physics.core.nutrient[waterIndex] = elementNutrient;
+        this.physics.core.energy[waterIndex] = elementEnergy;
+        this.physics.core.metadata[waterIndex] = elementMetadata;
+
+        // Mark both as active
+        this.physics.processedThisFrame[elementIndex] = 1;
+        nextActivePixels.add(elementIndex);
+        nextActivePixels.add(waterIndex);
     },
 
     // Try to move water horizontally
