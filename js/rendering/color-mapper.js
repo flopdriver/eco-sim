@@ -18,6 +18,12 @@ window.ColorMapper = {
 
     // Get color for a pixel based on its properties and current visualization mode
     getPixelColor: function(index) {
+        // Safety check: ensure we have proper initialization
+        if (!this.core || !this.TYPE || !this.STATE) {
+            console.error("ColorMapper not properly initialized");
+            return { r: 0, g: 0, b: 0 }; // Return black as fallback
+        }
+
         // Handle specialized visualization modes first
         if (VisualizationManager.getMode() !== 'normal') {
             return this.getSpecializedVisualizationColor(index);
@@ -195,7 +201,13 @@ window.ColorMapper = {
 
     // Get color for specialized visualization modes (moisture, energy, nutrient)
     getSpecializedVisualizationColor: function(index) {
-        const mode = VisualizationManager.getMode();
+        // Safety check: ensure we have proper initialization
+        if (!this.core || !this.TYPE) {
+            console.error("ColorMapper not properly initialized for specialized visualization");
+            return { r: 0, g: 0, b: 0 }; // Return black as fallback
+        }
+
+        const mode = window.WebGLRenderingSystem.visualizationManager.getMode();
 
         // Get the relevant property based on visualization mode
         let value = 0;
@@ -204,15 +216,15 @@ window.ColorMapper = {
         switch (mode) {
             case 'moisture':
                 value = this.core.water[index];
-                palette = VisualizationManager.colorPalettes.moisture;
+                palette = window.WebGLRenderingSystem.visualizationManager.colorPalettes.moisture;
                 break;
             case 'energy':
                 value = this.core.energy[index];
-                palette = VisualizationManager.colorPalettes.energy;
+                palette = window.WebGLRenderingSystem.visualizationManager.colorPalettes.energy;
                 break;
             case 'nutrient':
                 value = this.core.nutrient[index];
-                palette = VisualizationManager.colorPalettes.nutrient;
+                palette = window.WebGLRenderingSystem.visualizationManager.colorPalettes.nutrient;
                 break;
             default:
                 return { r: 0, g: 0, b: 0 }; // Black for unknown mode
@@ -226,7 +238,7 @@ window.ColorMapper = {
         }
 
         // Interpolate between colors based on value
-        const baseColor = VisualizationManager.interpolateColor(value, palette);
+        const baseColor = window.WebGLRenderingSystem.visualizationManager.interpolateColor(value, palette);
 
         // Add small random variation for more natural appearance
         return {

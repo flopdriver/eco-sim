@@ -27,7 +27,7 @@ window.WebGLRenderingSystem = {
         }
 
         // Initialize color mapper (depends on core and enums)
-        this.colorMapper = ColorMapper.init(core, this.TYPE, this.STATE);
+        this.colorMapper = ColorMapper.init(core, core.TYPE, core.STATE);
         if (!this.colorMapper) {
             console.error("Failed to initialize color mapper");
             return null;
