@@ -93,35 +93,35 @@ window.ColorMapper = {
                 break;
 
             case this.TYPE.PLANT:
-                // Different plant parts have different colors - more natural greens
+                // Different plant parts have different colors - ENHANCED CONTRAST
                 switch (state) {
                     case this.STATE.ROOT:
-                        // Roots - more natural brownish with water influence
-                        r = 140 - Math.floor(water * 0.2) + Math.floor(Math.random() * 10) - 5;
-                        g = 100 + Math.floor(water * 0.1) + Math.floor(Math.random() * 10) - 5;
-                        b = 60 + Math.floor(Math.random() * 8) - 4;
+                        // Roots - BRIGHTENED COLORS for better visibility against soil
+                        r = 160 - Math.floor(water * 0.2) + Math.floor(Math.random() * 10) - 5; // Increased from 140
+                        g = 120 + Math.floor(water * 0.1) + Math.floor(Math.random() * 10) - 5; // Increased from 100
+                        b = 80 + Math.floor(Math.random() * 8) - 4; // Increased from 60
                         break;
                     case this.STATE.STEM:
-                        // Stems - natural green-brown
-                        r = 80 + Math.floor(energy * 0.05) + Math.floor(Math.random() * 10) - 5;
-                        g = 120 + Math.floor(energy * 0.1) + Math.floor(Math.random() * 15) - 7;
-                        b = 50 + Math.floor(Math.random() * 10) - 5;
+                        // Stems - BRIGHTENED COLORS
+                        r = 65 + Math.floor(energy * 0.05) + Math.floor(Math.random() * 10) - 5; // Decreased from 80
+                        g = 160 + Math.floor(energy * 0.1) + Math.floor(Math.random() * 15) - 7; // Increased from 120
+                        b = 65 + Math.floor(Math.random() * 10) - 5; // Increased from 50
                         break;
                     case this.STATE.LEAF:
-                        // Leaves - more natural muted green with variation
+                        // Leaves - BRIGHTER, MORE VIVID green with variation
                         // Use both energy and water to influence color
                         const energyFactor = Math.min(1.0, energy / 200);
                         const waterFactor = Math.min(1.0, water / 200);
 
-                        // Base green color
-                        r = 40 + Math.floor(waterFactor * 20) + Math.floor(Math.random() * 15) - 7;
-                        g = 100 + Math.floor(energyFactor * 40) + Math.floor(Math.random() * 20) - 10;
-                        b = 30 + Math.floor(waterFactor * 20) + Math.floor(Math.random() * 10) - 5;
+                        // Base green color - MORE CONTRAST
+                        r = 30 + Math.floor(waterFactor * 20) + Math.floor(Math.random() * 15) - 7; // Decreased from 40
+                        g = 170 + Math.floor(energyFactor * 40) + Math.floor(Math.random() * 20) - 10; // Increased from 100
+                        b = 40 + Math.floor(waterFactor * 20) + Math.floor(Math.random() * 10) - 5; // Increased from 30
 
                         // Age variation - older leaves turn more yellow
                         if (Math.random() < 0.2) {
-                            r += 20;
-                            g -= 10;
+                            r += 25; // Increased from 20
+                            g -= 15; // Increased from 10
                         }
                         break;
                     case this.STATE.FLOWER:
@@ -132,22 +132,22 @@ window.ColorMapper = {
                             g = 240 + Math.floor(Math.random() * 15);
                             b = 220 + Math.floor(Math.random() * 35);
                         } else if (Math.random() < 0.5) {
-                            // Yellow/orange flowers
-                            r = 220 + Math.floor(Math.random() * 35);
-                            g = 180 + Math.floor(Math.random() * 75);
+                            // Yellow/orange flowers - BRIGHTENED
+                            r = 240 + Math.floor(Math.random() * 15); // Increased from 220
+                            g = 200 + Math.floor(Math.random() * 45); // Increased from 180
                             b = 50 + Math.floor(Math.random() * 30);
                         } else {
-                            // Pink/purple flowers
-                            r = 180 + Math.floor(Math.random() * 75);
+                            // Pink/purple flowers - BRIGHTENED
+                            r = 220 + Math.floor(Math.random() * 35); // Increased from 180
                             g = 100 + Math.floor(Math.random() * 40);
-                            b = 150 + Math.floor(Math.random() * 105);
+                            b = 200 + Math.floor(Math.random() * 55); // Increased from 150
                         }
                         break;
                     default:
-                        // Default green with variation
-                        r = 60 + Math.floor(Math.random() * 20) - 10;
-                        g = 120 + Math.floor(Math.random() * 30) - 15;
-                        b = 50 + Math.floor(Math.random() * 20) - 10;
+                        // Default green with variation - BRIGHTENED
+                        r = 50 + Math.floor(Math.random() * 20) - 10; // Decreased from 60
+                        g = 160 + Math.floor(Math.random() * 30) - 15; // Increased from 120
+                        b = 60 + Math.floor(Math.random() * 20) - 10; // Increased from 50
                 }
                 break;
 

@@ -349,15 +349,23 @@ const PlantSystem = {
             return this.growPrimaryRoot(x, y, index, environmentFactors, nextActivePixels);
         }
 
-        // Determine vertical component - lateral roots can go slightly up, straight, or down
+        // Determine vertical component
         let dy = 0;
-        const vertRandom = Math.random();
-        if (vertRandom < 0.6) {
-            dy = 1; // Downward bias
-        } else if (vertRandom < 0.9) {
-            dy = 0; // Straight
+        // Get the ground level from the core
+        const groundLevel = Math.floor(this.core.height * 0.6);
+
+        // If at or above ground level, ALWAYS grow downward
+        if (y <= groundLevel) {
+            dy = 1; // Force downward growth near surface
         } else {
-            dy = -1; // Occasionally grow slightly upward
+            // Below ground, safer to allow horizontal growth but not upward
+            const vertRandom = Math.random();
+            if (vertRandom < 0.7) {
+                dy = 1; // 70% chance to grow downward
+            } else {
+                dy = 0; // 30% chance to grow straight horizontally
+            }
+            // Never grow upward (removed the dy = -1 option)
         }
 
         // Try growing in the calculated direction

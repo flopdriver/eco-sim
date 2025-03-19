@@ -8,30 +8,30 @@ window.VisualizationManager = {
     // Available visualization modes
     availableModes: ['normal', 'moisture', 'energy', 'nutrient'],
 
-    // Color palettes for different visualization modes
+    // Color palettes for different visualization modes - ENHANCED CONTRAST
     colorPalettes: {
-        // For moisture visualization (blue gradient) - more natural blues
+        // For moisture visualization (blue gradient) - more saturated blues
         moisture: [
-            { level: 0, color: { r: 240, g: 240, b: 250 } },   // Dry - very pale blue
-            { level: 50, color: { r: 176, g: 196, b: 222 } },  // Low moisture - light steel blue
-            { level: 100, color: { r: 70, g: 130, b: 180 } },  // Medium moisture - steel blue
-            { level: 200, color: { r: 25, g: 25, b: 112 } }    // High moisture - midnight blue
+            { level: 0, color: { r: 240, g: 248, b: 255 } },   // Dry - alice blue
+            { level: 50, color: { r: 135, g: 206, b: 250 } },  // Low moisture - light sky blue
+            { level: 100, color: { r: 30, g: 144, b: 255 } },  // Medium moisture - dodger blue
+            { level: 200, color: { r: 0, g: 0, b: 139 } }      // High moisture - dark blue
         ],
 
-        // For energy visualization (yellow/orange/red gradient) - more earthy tones
+        // For energy visualization - BRIGHTER COLORS for better visibility
         energy: [
             { level: 0, color: { r: 245, g: 245, b: 220 } },   // Low energy - beige
-            { level: 50, color: { r: 210, g: 180, b: 140 } },  // Medium energy - tan
-            { level: 150, color: { r: 205, g: 133, b: 63 } },  // High energy - peru
-            { level: 250, color: { r: 165, g: 42, b: 42 } }    // Max energy - brown
+            { level: 50, color: { r: 255, g: 165, b: 0 } },    // Medium energy - orange
+            { level: 150, color: { r: 255, g: 69, b: 0 } },    // High energy - orange red
+            { level: 250, color: { r: 139, g: 0, b: 0 } }      // Max energy - dark red
         ],
 
-        // For nutrient visualization (green gradient) - more natural greens
+        // For nutrient visualization (green gradient) - more vibrant greens
         nutrient: [
             { level: 0, color: { r: 240, g: 240, b: 230 } },   // Low nutrients - cream
             { level: 50, color: { r: 144, g: 238, b: 144 } },  // Some nutrients - light green
-            { level: 100, color: { r: 60, g: 179, b: 113 } },  // Medium nutrients - medium sea green
-            { level: 200, color: { r: 34, g: 139, b: 34 } }    // High nutrients - forest green
+            { level: 100, color: { r: 34, g: 139, b: 34 } },   // Medium nutrients - forest green
+            { level: 200, color: { r: 0, g: 100, b: 0 } }      // High nutrients - dark green
         ]
     },
 
@@ -102,7 +102,7 @@ window.VisualizationManager = {
             case 'moisture':
                 return 'Showing water content: darker blue indicates higher moisture levels';
             case 'energy':
-                return 'Showing energy levels: brighter colors indicate higher energy';
+                return 'Showing energy levels: orange to red indicates higher energy';
             case 'nutrient':
                 return 'Showing nutrient density: darker green indicates higher nutrients';
             case 'normal':
