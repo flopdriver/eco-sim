@@ -20,6 +20,7 @@ const EnvironmentController = {
     weatherSystem: null,
     lightSystem: null,
     temperatureSystem: null,
+    lightningSystem: null, // New reference to lightning system
 
     // Initialize environment system
     init: function(core) {
@@ -31,7 +32,8 @@ const EnvironmentController = {
         this.weatherSystem = WeatherSystem.init(this);
         this.lightSystem = LightSystem.init(this);
         this.temperatureSystem = TemperatureSystem.init(this);
-        
+        this.lightningSystem = LightningSystem.init(this); // Initialize lightning system
+
         // Connect weather system with rendering systems
         if (window.ColorMapper) {
             window.ColorMapper.setWeatherSystem(this.weatherSystem);
@@ -53,6 +55,9 @@ const EnvironmentController = {
 
         // Process temperature
         this.temperatureSystem.updateTemperature(nextActivePixels);
+
+        // Process lightning and fire
+        this.lightningSystem.updateLightning(nextActivePixels);
 
         // Update UI indicators
         this.updateUI();

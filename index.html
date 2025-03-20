@@ -104,6 +104,13 @@
                     </label>
                     <input type="range" id="day-slider" min="1" max="10" value="5">
                 </div>
+                <div class="slider-control mini">
+                    <label>
+                        <span>Storm</span>
+                        <span id="lightning-value">10%</span>
+                    </label>
+                    <input type="range" id="lightning-slider" min="0" max="100" value="10">
+                </div>
             </div>
             
             <!-- Overlaid biology controls panel -->
@@ -209,6 +216,7 @@
 <script src="js/environment/light-system.js"></script>
 <script src="js/environment/temperature-system.js"></script>
 <script src="js/environment/environment-controller.js"></script>
+<script src="js/environment/lightning-system.js"></script>
 <!-- End of Environment System Components -->
 
 <!-- New modular physics system references -->
@@ -250,10 +258,6 @@
 <script src="js/rendering/webgl-renderer-interface.js"></script>
     <script src="js/rendering/zoom-controller.js"></script>
 <!-- End of WebGL Rendering System Components -->
-
-<!-- Chunk Optimisation -->
-<script src="js/sim-control/chunked-ecosystem.js"></script>
-<script src="js/sim-control/chunk-manager.js"></script>
 
 <!-- Simulation controller components -->
 <script src="js/sim-control/system-manager.js"></script>

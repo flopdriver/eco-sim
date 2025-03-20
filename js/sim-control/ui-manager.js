@@ -38,6 +38,20 @@ const UIManager = {
 
     // Set up environment control sliders
     setupEnvironmentControls: function() {
+
+        // Lightning intensity slider
+        this.setupSlider('lightning-slider', 'lightning-value', (value) => {
+            const percentage = value / 100;
+            if (this.controller.environment.lightningSystem) {
+                // Base factor to avoid zero, then scale based on slider value
+                const baseStrikeProbability = 0.0001;
+                const maxStrikeProbability = 0.05;
+                this.controller.environment.lightningSystem.lightningProperties.strikeProbability =
+                    baseStrikeProbability + percentage * (maxStrikeProbability - baseStrikeProbability);
+            }
+            return value + '%';
+        });
+
         // Rain frequency slider
         this.setupSlider('rain-slider', 'rain-value', (value) => {
             const percentage = value / 100;

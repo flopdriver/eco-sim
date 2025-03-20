@@ -197,6 +197,21 @@ const WeatherSystem = {
         this.weatherPatterns.current = selectedPattern;
         // Shorter weather patterns for more variety
         this.weatherPatterns.duration = 800 + Math.floor(Math.random() * 1200); // Reduced duration
+
+        // Update lightning-related settings based on weather pattern
+        if (this.environment.lightningSystem) {
+            // Adjust lightning probability based on weather pattern
+            if (this.weatherPatterns.current === 'storm') {
+                // High chance of lightning during storms
+                this.environment.lightningSystem.lightningProperties.strikeProbability = 0.2;
+            } else if (this.weatherPatterns.current === 'heavyRain') {
+                // Moderate chance during heavy rain
+                this.environment.lightningSystem.lightningProperties.strikeProbability = 0.05;
+            } else {
+                // Very low chance in other weather
+                this.environment.lightningSystem.lightningProperties.strikeProbability = 0.005;
+            }
+        }
         
         // Update environment controller with new rain probability
         this.environment.rainProbability = this.weatherPatterns.patterns[selectedPattern].rainProbability;
@@ -210,14 +225,14 @@ const WeatherSystem = {
             this.setRandomWeatherPattern();
             this.createInitialClouds();
         }
-        
+
         // Move clouds horizontally
         this.updateClouds();
 
         // Update rain properties based on current weather pattern
         const pattern = this.weatherPatterns.patterns[this.weatherPatterns.current];
         this.rainProperties.intensity = pattern.rainProbability;
-        
+
         // Increased droplet generation for two cloud layers
         this.rainProperties.maxDropletsPerTick = Math.floor(
             this.environment.core.width * 0.2 * pattern.rainProbability // Further increased for double cloud layer system
@@ -228,6 +243,21 @@ const WeatherSystem = {
         } else {
             // Clear existing rain
             this.rainProperties.droplets = [];
+        }
+
+        // Update lightning system with current weather conditions
+        if (this.environment.lightningSystem) {
+            // Set lightning probability based on weather pattern
+            if (this.weatherPatterns.current === 'storm') {
+                // High chance of lightning during storms
+                this.environment.lightningSystem.lightningProperties.strikeProbability = 0.02;
+            } else if (this.weatherPatterns.current === 'heavyRain') {
+                // Moderate chance during heavy rain
+                this.environment.lightningSystem.lightningProperties.strikeProbability = 0.005;
+            } else {
+                // Very low chance in other weather
+                this.environment.lightningSystem.lightningProperties.strikeProbability = 0.0005;
+            }
         }
     },
     
