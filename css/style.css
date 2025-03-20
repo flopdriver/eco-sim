@@ -316,3 +316,131 @@ canvas {
     font-weight: 600;
     margin-left: 5px;
 }
+
+/* Zoom controls panel */
+.zoom-panel {
+    position: absolute;
+    top: 140px;
+    right: 10px;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-sm);
+    padding: 8px;
+    z-index: 50;
+    color: white;
+    font-size: 0.7rem;
+    width: 120px;
+}
+
+/* Zoom buttons container */
+.zoom-buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+}
+
+/* Individual zoom buttons */
+.zoom-button {
+    width: 25px;
+    height: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    font-size: 14px;
+    border: none;
+    color: white;
+}
+
+.zoom-button:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Tooltip for panning instructions */
+.pan-tooltip {
+    font-size: 0.6rem;
+    margin-top: 5px;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+}
+
+/* Right-click context menu disabling */
+canvas {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent context menu on right-click */
+canvas:focus {
+    outline: none;
+}
+
+/* Cursor changes for tools and panning */
+.canvas-container {
+    cursor: default;
+}
+
+.canvas-container.observe-tool {
+    cursor: crosshair;
+}
+
+.canvas-container.panning {
+    cursor: move;
+    cursor: grab;
+}
+
+.canvas-container.panning:active {
+    cursor: grabbing;
+}
+
+/* Small label for sliders */
+.slider-label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2px;
+    font-size: 0.65rem;
+}
+
+/* Custom sliders */
+input[type=range].mini-slider {
+    height: 4px;
+    -webkit-appearance: none;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    width: 100%;
+}
+
+input[type=range].mini-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+    .zoom-panel {
+        top: auto;
+        bottom: 70px;
+        right: 10px;
+    }
+
+    .zoom-button {
+        width: 30px;
+        height: 30px;
+        font-size: 16px;
+    }
+}

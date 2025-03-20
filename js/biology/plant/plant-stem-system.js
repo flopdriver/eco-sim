@@ -4,6 +4,21 @@
 const PlantStemSystem = {
     // Reference to parent plant system
     plant: null,
+
+    // Trunk development parameters
+    trunkParams: {
+        initialTrunkHeight: 200
+        ,   // Initial trunk height before branching
+        trunkThicknessVariation: 10, // Variation in trunk thickness
+        maxTrunkHeight: 300,         // Maximum height before extensive branching
+        trunkColorVariations: [
+            { r: 110, g: 70, b: 40 },   // Brown
+            { r: 100, g: 65, b: 35 },   // Darker brown
+            { r: 120, g: 75, b: 45 },   // Lighter brown
+            { r: 90, g: 60, b: 30 },    // Reddish brown
+            { r: 130, g: 80, b: 50 }    // Warm brown
+        ]
+    },
     
     // Initialize stem system
     init: function(plantSystem) {
@@ -13,18 +28,103 @@ const PlantStemSystem = {
     
     // Update stem behavior
     updateStem: function(x, y, index, nextActivePixels) {
-        // Stems grow upward and can branch - dramatically reduced energy requirement and massively increased chance
-        if (this.plant.core.energy[index] > 40 && Math.random() < 0.35 * this.plant.biology.growthRate) {
-            this.growStem(x, y, index, nextActivePixels);
+
+        // Get the plant group ID to determine species and track trunk development
+        const plantGroupId = this.plant.plantGroups[index];
+
+        // Ensure we have tracking for this plant's trunk development
+        if (!this.plant.trunkDevelopment) {
+            this.plant.trunkDevelopment = {};
         }
 
-        // Stems can grow leaves - dramatically reduced energy requirement and massively increased chance
-        if (this.plant.core.energy[index] > 50 && Math.random() < 0.30 * this.plant.biology.growthRate) { // Massively increased leaf production
-            this.growLeaf(x, y, index, nextActivePixels);
+        if (!this.plant.trunkDevelopment[plantGroupId]) {
+            this.plant.trunkDevelopment[plantGroupId] = {
+                height: 0,
+                thickness: 1 + Math.floor(Math.random() * this.trunkParams.trunkThicknessVariation),
+                trunkColor: this.trunkParams.trunkColorVariations[
+                    Math.floor(Math.random() * this.trunkParams.trunkColorVariations.length)
+                    ]
+            };
+        }
+
+        const trunkDev = this.plant.trunkDevelopment[plantGroupId];
+
+        // Check if we're still in trunk development phase
+        const isTrunkDevelopmentPhase = trunkDev.height < this.trunkParams.initialTrunkHeight;
+        const canContinueTrunkGrowth = trunkDev.height < this.trunkParams.maxTrunkHeight;
+
+        // Trunk growth is modified to be more consistent and controlled
+        if (canContinueTrunkGrowth && this.plant.core.energy[index] > 40 && Math.random() < 0.35 * this.plant.biology.growthRate) {
+            this.growTrunk(x, y, index, trunkDev, nextActivePixels);
+        }
+
+        // Start branching after initial trunk development
+        if (!isTrunkDevelopmentPhase) {
+            // Slightly reduced chance of stem/branch growth compared to trunk growth
+            if (this.plant.core.energy[index] > 50 && Math.random() < 0.30 * this.plant.biology.growthRate) {
+                this.growStem(x, y, index, nextActivePixels);
+            }
+
+            // Leaf growth after trunk development
+            if (this.plant.core.energy[index] > 60 && Math.random() < 0.25 * this.plant.biology.growthRate) {
+                this.growLeaf(x, y, index, nextActivePixels);
+            }
         }
 
         // Stems remain active
         nextActivePixels.add(index);
+    },
+
+    // Grow a consistent, thickening trunk
+    growTrunk: function(x, y, index, trunkDev, nextActivePixels) {
+        // Try to grow upward, maintaining a consistent thickness
+        const newY = y - 1;
+        const newIndex = this.plant.core.getIndex(x, newY);
+
+        // Slight horizontal variation for more natural trunk growth
+        const horizontalOffset = Math.random() < 0.2 ?
+            (Math.random() < 0.5 ? -1 : 1) : 0;
+        const newX = x + horizontalOffset;
+        const adjustedNewIndex = this.plant.core.getIndex(newX, newY);
+
+        // Can only grow into air
+        if (newIndex !== -1 && this.plant.core.type[newIndex] === this.plant.TYPE.AIR &&
+            (!horizontalOffset || (adjustedNewIndex !== -1 &&
+                this.plant.core.type[adjustedNewIndex] === this.plant.TYPE.AIR))) {
+
+            // Use the adjusted index if horizontal offset is used
+            const finalIndex = horizontalOffset ? adjustedNewIndex : newIndex;
+
+            // Create new trunk pixel
+            this.plant.core.type[finalIndex] = this.plant.TYPE.PLANT;
+            this.plant.core.state[finalIndex] = this.plant.STATE.STEM;
+
+            // Transfer energy with slight reduction
+            this.plant.core.energy[finalIndex] = this.plant.core.energy[index] * 0.7;
+            this.plant.core.energy[index] *= 0.8;
+
+            // Water transfer
+            this.plant.core.water[finalIndex] = this.plant.core.water[index] * 0.6;
+            this.plant.core.water[index] *= 0.8;
+
+            // Add trunk-specific metadata to help with coloration and tracking
+            // Store trunk thickness in high bits, use low bits for color variation
+            this.plant.core.metadata[finalIndex] = 50 + Math.min(20, trunkDev.thickness * 5);
+
+            // Propagate plant group ID
+            if (this.plant.plantGroups[index]) {
+                this.plant.plantGroups[finalIndex] = this.plant.plantGroups[index];
+            }
+
+            // Mark as connected to ground
+            this.plant.plantConnectivity.connectedToGround[finalIndex] = 1;
+            this.plant.plantConnectivity.checkedThisFrame[finalIndex] = 1;
+
+            // Increment trunk height
+            trunkDev.height++;
+
+            nextActivePixels.add(finalIndex);
+        }
     },
 
     // Grow new stem pixels with connectivity checks

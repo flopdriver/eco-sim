@@ -13,7 +13,7 @@ const WeatherSystem = {
         cloudColor: null,      // Base cloud color
         upperLayerColor: null, // Upper layer cloud color
         lowerLayerColor: null, // Lower layer cloud color
-        movementSpeed: 0.3,    // Cloud movement speed
+        movementSpeed: 0.5,    // Cloud movement speed
         cloudDensity: 0.9      // Cloud density factor
     },
 
@@ -23,9 +23,9 @@ const WeatherSystem = {
         droplets: [],          // Array to store active rain droplets
         maxDropletsPerTick: 0, // Maximum number of droplets per tick
         dropletSizes: {        // Different droplet size configurations (massively increased for Jumanji effect)
-            small: { water: 250, speed: 20, probability: 0.3 },
-            medium: { water: 400, speed: 30, probability: 0.4 },
-            large: { water: 600, speed: 40, probability: 0.3 }  // Increased large droplet probability
+            small: { water: 200, speed: 20, probability: 0.3 },
+            medium: { water: 300, speed: 30, probability: 0.4 },
+            large: { water: 400, speed: 40, probability: 0.3 }  // Increased large droplet probability
         },
         splashEnabled: true    // Enable water splash effects
     },
@@ -36,10 +36,10 @@ const WeatherSystem = {
         duration: 0,           // Duration of current pattern
         transitionSpeed: 0.02, // Speed of transitions between patterns
         patterns: {
-            clear: { cloudiness: 0.2, rainProbability: 0.3 },
-            partlyCloudy: { cloudiness: 0.5, rainProbability: 0.5 },
-            overcast: { cloudiness: 0.8, rainProbability: 0.8 },
-            lightRain: { cloudiness: 0.7, rainProbability: 0.9 },
+            clear: { cloudiness: 0.2, rainProbability: 0.5 },
+            partlyCloudy: { cloudiness: 0.5, rainProbability: 0.6 },
+            overcast: { cloudiness: 0.8, rainProbability: 0.9 },
+            lightRain: { cloudiness: 0.7, rainProbability: 1.0 },
             heavyRain: { cloudiness: 0.9, rainProbability: 1.0 },
             storm: { cloudiness: 1.0, rainProbability: 1.0 }
         }
@@ -99,13 +99,13 @@ const WeatherSystem = {
 
         // Create varied clouds based on cloudiness
         const cloudiness = this.weatherPatterns.patterns[this.weatherPatterns.current].cloudiness;
-        const numClouds = Math.floor(3 + cloudiness * 5); // 3-8 clouds based on cloudiness
+        const numClouds = Math.floor(6 + cloudiness * 5); // 3-8 clouds based on cloudiness
         
         // Create clouds in two layers for a more dynamic sky
         for (let cloud = 0; cloud < numClouds; cloud++) {
             const cloudStartX = Math.floor(Math.random() * core.width);
             const cloudWidth = Math.floor(this.cloudProperties.maxCloudWidth * (0.3 + cloudiness * 0.4));
-            const cloudHeight = Math.floor(core.height * 0.06 * (0.8 + cloudiness));
+            const cloudHeight = Math.floor(core.height * 0.1 * (0.8 + cloudiness));
             
             // Determine which cloud layer this cloud belongs to
             let cloudY;
@@ -113,11 +113,11 @@ const WeatherSystem = {
             
             if (cloud % 2 === 0) {
                 // Upper layer (5-10% from top)
-                cloudY = Math.floor(core.height * 0.05 + Math.random() * Math.floor(core.height * 0.05));
+                cloudY = Math.floor(core.height * 0.05 + Math.random() * Math.floor(core.height * 0.01));
                 cloudLayerType = 'upper';
             } else {
                 // Lower layer (12-18% from top)
-                cloudY = Math.floor(core.height * 0.12 + Math.random() * Math.floor(core.height * 0.06));
+                cloudY = Math.floor(core.height * 0.01 + Math.random() * Math.floor(core.height * 0.06));
                 cloudLayerType = 'lower';
             }
             
@@ -270,7 +270,7 @@ const WeatherSystem = {
         }
         
         // Occasionally vary cloud density and shape (less frequently)
-        if (Math.random() < 0.002) {
+        if (Math.random() < 0.02) {
             for (let i = 0; i < this.cloudProperties.cloudPixels.length; i++) {
                 if (Math.random() < 0.05) {
                     this.cloudProperties.cloudPixels.splice(i, 1);

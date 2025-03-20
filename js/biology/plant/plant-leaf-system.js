@@ -18,7 +18,7 @@ const PlantLeafSystem = {
         
         // Leaves perform photosynthesis (convert light to energy)
         // Energy depends on the amount of light received and water availability
-        if (this.plant.core.energy[index] < 300) { // Dramatically increased energy cap
+        if (this.plant.core.energy[index] < 200) { // Dramatically increased energy cap
             // Base photosynthesis rate
             let photosynthesisRate = 0.08; // Increased base rate for faster energy production
             

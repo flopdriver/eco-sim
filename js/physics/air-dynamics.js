@@ -26,19 +26,19 @@ const AirDynamicsSystem = {
     initializeStableWindParameters: function() {
         // Set wind to blow more horizontally with slight downward component
         this.windDirection = 45 + (Math.random() * 30); // 45-75 degrees, much more horizontal
-        
+
         // Strong wind strength
         this.windStrength = 0.6; // Strong to move water effectively sideways
-        
+
         // Moderate turbulence
         this.turbulenceIntensity = 0.3; // More variation to prevent stagnation
     },
-    
+
     // Randomize wind parameters periodically with stronger horizontal bias
     randomizeWindParameters: function() {
         // Predominantly horizontal wind with bias to right or left
         // Either 0-60 degrees (right with down) or 120-180 degrees (left with down)
-        this.windDirection = Math.random() < 0.5 ? 
+        this.windDirection = Math.random() < 0.5 ?
             (Math.random() * 60) : // Right-biased: 0-60 degrees
             (120 + Math.random() * 60); // Left-biased: 120-180 degrees
 
@@ -56,28 +56,23 @@ const AirDynamicsSystem = {
             this.randomizeWindParameters();
         }
 
-        // Collect air pixels, prioritizing those below ground
-        const aboveGroundAirPixels = [];
-        const belowGroundAirPixels = [];
-        
+        // Collect air pixels, prioritizing those above ground
+        const airPixels = [];
+
         // Calculate ground level
         const groundLevel = Math.floor(this.physics.core.height * 0.6);
-        
+
         activePixels.forEach(index => {
             if (this.physics.core.type[index] === this.physics.TYPE.AIR) {
                 const coords = this.physics.core.getCoords(index);
-                
-                // Sort air pixels based on whether they're below ground
-                if (coords.y > groundLevel) {
-                    belowGroundAirPixels.push({index, x: coords.x, y: coords.y});
-                } else {
-                    aboveGroundAirPixels.push({index, x: coords.x, y: coords.y});
+
+                // Only process air pixels that are above ground level
+                // This prevents air bubble creation below the soil line
+                if (coords.y <= groundLevel) {
+                    airPixels.push({index, x: coords.x, y: coords.y});
                 }
             }
         });
-        
-        // Combine arrays with below-ground air processed first
-        const airPixels = [...belowGroundAirPixels, ...aboveGroundAirPixels];
 
         // Process air pixels with wind and turbulence
         for (const pixel of airPixels) {
@@ -93,57 +88,10 @@ const AirDynamicsSystem = {
     updateSingleAirPixel: function(x, y, index, nextActivePixels) {
         // Calculate ground level
         const groundLevel = Math.floor(this.physics.core.height * 0.6);
-        
-        // Check if this air is below ground level
+
+        // Check if this air is below ground level (should never be the case now with our filter)
         const isBelowGround = y > groundLevel;
-        
-        // If below ground, always process it and make it rise upward
-        if (isBelowGround) {
-            // Air bubbles below ground will always rise upward
-            
-            // Determine bubble movement - varies based on depth
-            const depthBelowGround = y - groundLevel;
-            const bubbleSpeed = Math.min(3, 1 + Math.floor(depthBelowGround / 40)); // Deeper bubbles rise faster
-            
-            // Add slight horizontal wobble for bubble effect
-            const wobbleIntensity = Math.min(2, Math.floor(depthBelowGround / 60) + 1);
-            const dx = Math.floor(Math.random() * (wobbleIntensity * 2 + 1)) - wobbleIntensity; // Random wobble
-            
-            // Bubble vertically with variable speed (deeper = faster rising)
-            const dy = -bubbleSpeed; // Always move upward
-            
-            // Try to move the bubble
-            const newX = x + dx;
-            const newY = y + dy;
-            const newIndex = this.physics.core.getIndex(newX, newY);
-            
-            // Always mark air bubbles as active
-            nextActivePixels.add(index);
-            
-            // If there's a valid position, try to move there
-            if (newIndex !== -1) {
-                // Air bubbles can move through ANY material when below ground
-                this.physics.core.swapPixels(index, newIndex);
-                nextActivePixels.add(newIndex);
-                
-                // If the bubble moved a lot vertically, create a trail of smaller bubbles
-                if (bubbleSpeed > 1 && Math.random() < 0.3) {
-                    // Create a trailing bubble if possible
-                    const trailY = y - 1; // Just one spot behind
-                    const trailX = x + (Math.random() < 0.5 ? -1 : 1); // Slightly off to the side
-                    const trailIndex = this.physics.core.getIndex(trailX, trailY);
-                    
-                    if (trailIndex !== -1 && this.physics.core.type[trailIndex] !== this.physics.TYPE.AIR) {
-                        // Convert to air (create a trailing bubble)
-                        this.physics.core.type[trailIndex] = this.physics.TYPE.AIR;
-                        nextActivePixels.add(trailIndex);
-                    }
-                }
-            }
-            
-            return;
-        }
-        
+
         // For air above ground, use normal wind dynamics
         // Check if we should process this air pixel
         // Increased chance of moving to create more active wind
@@ -151,7 +99,7 @@ const AirDynamicsSystem = {
             nextActivePixels.add(index);
             return;
         }
-        
+
         // Calculate wind movement based on wind direction and strength
         const windVector = this.calculateWindVector();
 
@@ -166,53 +114,9 @@ const AirDynamicsSystem = {
         const newY = y + dy;
         const newIndex = this.physics.core.getIndex(newX, newY);
 
-        // Check if we're below ground for different behavior
-        // Note: groundLevel is already defined above
-        
         if (newIndex !== -1) {
             const targetType = this.physics.core.type[newIndex];
-            
-            // BELOW GROUND BEHAVIOR: Air bubbles can move through anything when below ground
-            if (isBelowGround && dy < 0) { // Below ground and trying to move upward
-                // Track the previous state of the material being displaced
-                const targetState = this.physics.core.state[newIndex];
-                
-                // Air bubbles move through ANY material when below ground, simulating bubbles rising
-                this.physics.core.swapPixels(index, newIndex);
-                
-                // If the bubble moved through soil, slightly affect the soil state to show passage
-                if (targetType === this.physics.TYPE.SOIL) {
-                    // Activate nearby soil to show bubble disturbance
-                    for (let offsetY = 0; offsetY <= 1; offsetY++) {
-                        for (let offsetX = -1; offsetX <= 1; offsetX++) {
-                            if (offsetX === 0 && offsetY === 0) continue; // Skip the bubble itself
-                            
-                            const soilX = newX + offsetX;
-                            const soilY = newY + offsetY;
-                            const soilIdx = this.physics.core.getIndex(soilX, soilY);
-                            
-                            if (soilIdx !== -1 && 
-                                this.physics.core.type[soilIdx] === this.physics.TYPE.SOIL) {
-                                // Make the soil active for visual effect
-                                nextActivePixels.add(soilIdx);
-                                
-                                // Small chance to slightly loosen soil along bubble path
-                                if (Math.random() < 0.1) {
-                                    if (this.physics.core.state[soilIdx] !== this.physics.STATE.WET) {
-                                        this.physics.core.state[soilIdx] = this.physics.STATE.LOOSE;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Activate both the bubble and where it was
-                nextActivePixels.add(index);
-                nextActivePixels.add(newIndex);
-                return;
-            }
-            
+
             // ABOVE GROUND BEHAVIOR: Normal air movement rules
             const movableTypes = [
                 this.physics.TYPE.AIR,
@@ -220,7 +124,7 @@ const AirDynamicsSystem = {
                 this.physics.TYPE.DEAD_MATTER,
                 this.physics.TYPE.WATER // Allow air to push water
             ];
-            
+
             // First check if target is a plant - protect all plant types
             if (targetType === this.physics.TYPE.PLANT) {
                 // Leaves can rustle in the wind (activate but don't move)
@@ -265,7 +169,7 @@ const AirDynamicsSystem = {
                             }
                         }
                     }
-                    
+
                     // If air is pushing water upward, still limit but allow some movement
                     if (dy < 0) {
                         if (Math.random() < 0.03) { // Reduce upward probability slightly
@@ -277,7 +181,7 @@ const AirDynamicsSystem = {
                         }
                     }
                 }
-                
+
                 // Swap pixels
                 this.physics.core.swapPixels(index, newIndex);
 

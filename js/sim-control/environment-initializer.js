@@ -23,11 +23,42 @@ const EnvironmentInitializer = {
         // Fill everything with air initially
         core.type.fill(TYPE.AIR);
 
-        // Create ground/soil in the bottom portion
-        const groundLevel = Math.floor(core.height * 0.6); // Increased to 60% for more soil
+        // Create ground/soil in the bottom portion with more pronounced wavy terrain
+        const groundLevelBase = Math.floor(core.height * 0.6); // Base ground level
+        const terrainVariation = 40; // Increased maximum height variation
+        const frequency = 0.01; // Lower frequency for longer, more sweeping hills
+        const additionalFrequency = 0.2; // Additional higher frequency for more detail
 
-        for (let y = groundLevel; y < core.height; y++) {
-            for (let x = 0; x < core.width; x++) {
+        // Generate terrain noise with multiple frequency components
+        const terrainNoise = new Array(core.width).fill(0).map((_, x) => {
+            // Low-frequency large hills
+            const mainHill = Math.sin(x * frequency) * terrainVariation * 0.5;
+
+            // Higher frequency smaller variations
+            const detailVariation = Math.sin(x * (frequency * 4)) * (terrainVariation * 0.1) +
+                Math.sin(x * (frequency * 8)) * (terrainVariation * 0.1);
+
+            // Random additional noise for more natural feel
+            const randomNoise = (Math.random() * terrainVariation * 0.2) - (terrainVariation * 0.5);
+
+            return mainHill + detailVariation + randomNoise;
+        });
+
+        // Smooth the terrain noise with a wider kernel
+        const smoothTerrainNoise = terrainNoise.map((val, i, arr) => {
+            // Wider averaging for smoother transitions
+            const smoothingKernel = [-2, -1, 0, 1, 2].map(offset =>
+                arr[i + offset] || val
+            );
+            return smoothingKernel.reduce((sum, v) => sum + v, 0) / smoothingKernel.length;
+        });
+
+        for (let x = 0; x < core.width; x++) {
+            // Calculate ground level with noise
+            const groundVariation = smoothTerrainNoise[x];
+            const groundLevel = Math.floor(groundLevelBase + groundVariation);
+
+            for (let y = groundLevel; y < core.height; y++) {
                 const index = core.getIndex(x, y);
                 core.type[index] = TYPE.SOIL;
 
@@ -40,13 +71,18 @@ const EnvironmentInitializer = {
                 } else {
                     // Regular soil - drier near surface, wetter deep down
                     const depth = (y - groundLevel) / (core.height - groundLevel);
-                    core.state[index] = depth > 0.3 ? STATE.WET : STATE.DRY;
 
-                    // Water increases with depth
-                    core.water[index] = Math.floor(depth * 150);
+                    // Add some randomness to soil moisture
+                    const moistureVariation = Math.random() * 0.4 - 0.2; // -0.2 to 0.2 variation
+                    const moistureDepth = Math.min(1, depth + moistureVariation);
 
-                    // Nutrients vary randomly
-                    core.nutrient[index] = 30 + Math.floor(Math.random() * 40);
+                    core.state[index] = moistureDepth > 0.3 ? STATE.WET : STATE.DRY;
+
+                    // Water increases with depth, with added variation
+                    core.water[index] = Math.floor(moistureDepth * 150 * (0.8 + Math.random() * 0.4));
+
+                    // Nutrients vary randomly with slight depth influence
+                    core.nutrient[index] = 30 + Math.floor(Math.random() * 40 * (1 + depth));
                 }
 
                 // Mark as active for first update
@@ -54,12 +90,14 @@ const EnvironmentInitializer = {
             }
         }
 
-        // Add plant seeds
-        this.addInitialSeeds(groundLevel);
-        // Add worms
-        this.addInitialWorms(groundLevel);
+        // Add plant seeds to the environment
+        this.addInitialSeeds(groundLevelBase);
 
-        this.addInitialInsects(groundLevel);
+        // Add worms to help with soil fertility
+        this.addInitialWorms(groundLevelBase);
+
+        // Add initial insects to create ecosystem dynamics
+        this.addInitialInsects(groundLevelBase);
     },
 
     // Add initial seeds to the environment
@@ -69,7 +107,7 @@ const EnvironmentInitializer = {
         const activePixels = this.controller.activePixels;
 
         // Add a few varied plant seeds on the surface
-        const numSeeds = 8 + Math.floor(Math.random() * 5); // 8-12 seeds
+        const numSeeds = 80 + Math.floor(Math.random() * 15); // 8-12 seeds
         const seedPositions = new Set();
 
         // Create unique positions for seeds
@@ -98,7 +136,7 @@ const EnvironmentInitializer = {
         const activePixels = this.controller.activePixels;
 
         // Add a few initial worms in the soil to help fertility
-        const numWorms = 3 + Math.floor(Math.random() * 3); // 3-5 worms
+        const numWorms = 30 + Math.floor(Math.random() * 3); // 3-5 worms
         for (let i = 0; i < numWorms; i++) {
             const x = Math.floor(Math.random() * core.width);
             const y = groundLevel + Math.floor(Math.random() * (core.height - groundLevel) * 0.5);
@@ -111,7 +149,8 @@ const EnvironmentInitializer = {
             }
         }
     },
-    
+
+    // Add initial insects to the environment
     addInitialInsects: function(groundLevel) {
         const core = this.controller.core;
         const TYPE = this.controller.TYPE;
