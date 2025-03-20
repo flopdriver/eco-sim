@@ -11,6 +11,12 @@ const PerformanceManager = {
     // Active pixel management
     maxActivePixels: 100000, // Safety limit to prevent performance issues
 
+    chunkedPerformanceStats: {
+        activeChunks: 0,
+        totalChunks: 0,
+        processingPercent: 0
+    },
+
     // Initialize performance manager
     init: function(controller) {
         console.log("Initializing performance manager...");
@@ -36,6 +42,16 @@ const PerformanceManager = {
         const currentTime = performance.now();
         this.fps = 1000 / (currentTime - this.lastUpdate);
         this.lastUpdate = currentTime;
+
+        // Update chunked performance stats if using chunked processing
+        if (this.controller.useChunkedProcessing && this.controller.chunkManager) {
+            this.chunkedPerformanceStats.activeChunks =
+                this.controller.chunkManager.getActiveChunkCount();
+            this.chunkedPerformanceStats.totalChunks =
+                this.controller.chunkManager.getTotalChunkCount();
+            this.chunkedPerformanceStats.processingPercent =
+                (this.chunkedPerformanceStats.activeChunks / this.chunkedPerformanceStats.totalChunks * 100).toFixed(1);
+        }
     },
 
     // Manage active pixels with performance considerations
@@ -84,5 +100,14 @@ const PerformanceManager = {
     // Get current FPS
     getFPS: function() {
         return Math.round(this.fps);
-    }
+    },
+
+    // methods for chunk performance stats
+    getActiveChunkCount: function() {
+        return this.chunkedPerformanceStats.activeChunks;
+    },
+
+    getProcessingPercent: function() {
+        return this.chunkedPerformanceStats.processingPercent;
+    },
 };
