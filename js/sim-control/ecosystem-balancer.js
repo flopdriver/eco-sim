@@ -1,4 +1,4 @@
-// Ecosystem Balancer - Manages ecosystem balance for chunked processing
+// Ecosystem Balancer - Manages ecosystem balance mechanics
 const EcosystemBalancer = {
     // Reference to main controller
     controller: null,
@@ -11,25 +11,10 @@ const EcosystemBalancer = {
         soilQualityImpact: 1.0     // How much soil quality affects growth
     },
 
-    // Population estimates
-    populationEstimates: {
-        plants: 0,
-        insects: 0,
-        worms: 0,
-        seeds: 0,
-        water: 0,
-        soil: 0
-    },
-
-    // Last balance check time
-    lastBalanceCheck: 0,
-    balanceCheckInterval: 30, // Frames between balance checks
-
     // Initialize ecosystem balancer
     init: function(controller) {
         console.log("Initializing ecosystem balancer...");
         this.controller = controller;
-        this.lastBalanceCheck = 0;
         return this;
     },
 
@@ -86,91 +71,36 @@ const EcosystemBalancer = {
 
         // Log changes for debugging
         console.log(`Updated biological rates - Metabolism: ${biology.metabolism.toFixed(2)}, Growth: ${biology.growthRate.toFixed(2)}, Reproduction: ${biology.reproduction.toFixed(2)}`);
-
-        // Also update chunk-based ecosystem parameters if needed
-        if (this.controller.chunkManager && this.controller.chunkManager.chunkedEcosystem) {
-            // Update biological parameters in chunked ecosystem if it has such properties
-            const chunkedEcosystem = this.controller.chunkManager.chunkedEcosystem;
-            if (chunkedEcosystem.environmentParams) {
-                chunkedEcosystem.environmentParams.metabolism = biology.metabolism;
-                chunkedEcosystem.environmentParams.growthRate = biology.growthRate;
-                chunkedEcosystem.environmentParams.reproduction = biology.reproduction;
-            }
-        }
-    },
-
-    // Estimation of ecosystem populations from chunk system
-    estimatePopulations: function() {
-        // Only update periodically
-        if (this.lastBalanceCheck++ < this.balanceCheckInterval) {
-            return;
-        }
-
-        this.lastBalanceCheck = 0;
-
-        // Use sampling to estimate population sizes
-        const ecosystem = this.controller.chunkManager.chunkedEcosystem;
-        const sampleSize = Math.min(5000, ecosystem.typeArray.length); // Sample up to 5000 pixels
-        const sampleInterval = Math.floor(ecosystem.typeArray.length / sampleSize);
-
-        // Reset counts
-        const counts = {
-            plants: 0,
-            insects: 0,
-            worms: 0,
-            seeds: 0,
-            water: 0,
-            soil: 0
-        };
-
-        // Sample the ecosystem
-        for (let i = 0; i < ecosystem.typeArray.length; i += sampleInterval) {
-            const pixelType = ecosystem.typeArray[i];
-
-            switch(pixelType) {
-                case 3: // Plant
-                    counts.plants++;
-                    break;
-                case 4: // Insect
-                    counts.insects++;
-                    break;
-                case 7: // Worm
-                    counts.worms++;
-                    break;
-                case 5: // Seed
-                    counts.seeds++;
-                    break;
-                case 2: // Water
-                    counts.water++;
-                    break;
-                case 1: // Soil
-                    counts.soil++;
-                    break;
-            }
-        }
-
-        // Scale up the estimates
-        const scaleFactor = ecosystem.typeArray.length / sampleSize;
-        for (const key in counts) {
-            this.populationEstimates[key] = Math.round(counts[key] * scaleFactor);
-        }
-
-        // Check ecosystem balance now that we have population estimates
-        this.checkEcosystemBalance();
     },
 
     // Check ecosystem balance and apply corrections if needed
-    checkEcosystemBalance: function() {
-        // Get population estimates
-        const plantCount = this.populationEstimates.plants;
-        const insectCount = this.populationEstimates.insects;
-        const wormCount = this.populationEstimates.worms;
-
+    checkEcosystemBalance: function(plantCount, insectCount, wormCount) {
         // More sophisticated population dynamics
-        const totalCells = this.controller.core.width * this.controller.core.height;
-        const totalActiveCells = totalCells * 0.4;
+        const totalActiveCells = this.controller.core.width * this.controller.core.height * 0.4;
 
-        // If too many plants and few insects, spawn more insects
+        // Track plant maturity by checking total plant energy
+        let totalPlantEnergy = 0;
+        let maturePlantCount = 0;
+
+        // Sample plant cells to estimate maturity (checking all would be expensive)
+        const core = this.controller.core;
+        const TYPE = this.controller.TYPE;
+        const sampleSize = 100;
+
+        for (let i = 0; i < sampleSize; i++) {
+            const x = Math.floor(Math.random() * core.width);
+            const y = Math.floor(Math.random() * core.height);
+            const index = core.getIndex(x, y);
+
+            if (index !== -1 && core.type[index] === TYPE.PLANT) {
+                totalPlantEnergy += core.energy[index];
+                if (core.energy[index] > 100) {
+                    maturePlantCount++;
+                }
+            }
+        }
+
+        // If too many plants and few insects, spawn more
         if (plantCount > totalActiveCells * 0.4 && insectCount < 10) {
             this.spawnRandomInsects(5 + Math.floor(plantCount / 50)); // Scale spawn with plant count
         }
@@ -195,27 +125,14 @@ const EcosystemBalancer = {
             // Normalize metabolism
             this.controller.biology.metabolism = Math.max(0.5, this.controller.biology.metabolism * 0.85);
         }
-
-        // Update chunk ecosystem parameters if available
-        this.updateChunkEcosystemParams();
-    },
-
-    // Update chunk ecosystem parameters
-    updateChunkEcosystemParams: function() {
-        if (this.controller.chunkManager && this.controller.chunkManager.chunkedEcosystem) {
-            const chunkedEcosystem = this.controller.chunkManager.chunkedEcosystem;
-            if (chunkedEcosystem.environmentParams) {
-                chunkedEcosystem.environmentParams.metabolism = this.controller.biology.metabolism;
-                chunkedEcosystem.environmentParams.growthRate = this.controller.biology.growthRate;
-                chunkedEcosystem.environmentParams.reproduction = this.controller.biology.reproduction;
-            }
-        }
     },
 
     // Helper function to spawn random insects as a balancing mechanism
     spawnRandomInsects: function(count) {
         const core = this.controller.core;
-        const ecosystem = this.controller.chunkManager.chunkedEcosystem;
+        const TYPE = this.controller.TYPE;
+        const STATE = this.controller.STATE;
+        const activePixels = this.controller.activePixels;
 
         for (let i = 0; i < count; i++) {
             // Find a random air cell in the upper half
@@ -223,13 +140,12 @@ const EcosystemBalancer = {
             const y = Math.floor(Math.random() * (core.height * 0.3));
             const index = core.getIndex(x, y);
 
-            if (index !== -1 && ecosystem.typeArray[index] === 0) {
-                // Create insect in the chunk ecosystem
-                ecosystem.typeArray[index] = 4; // Insect
-                ecosystem.energyArray[index] = 150; // Initial energy
-
-                // Mark change in the chunk system
-                this.controller.chunkManager.markChange(x, y);
+            if (index !== -1 && core.type[index] === TYPE.AIR) {
+                // Create insect
+                core.type[index] = TYPE.INSECT;
+                core.state[index] = STATE.ADULT;
+                core.energy[index] = 150; // Initial energy
+                activePixels.add(index);
             }
         }
     }

@@ -14,7 +14,7 @@ const SystemManager = {
     initializeSystems: function(canvasId) {
         console.log("Initializing subsystems...");
 
-        // 1. Core data structures (still needed for rendering/reference)
+        // 1. Core data structures (no dependencies)
         this.controller.core = CoreSimulation.init();
         if (!this.controller.core) {
             console.error("Failed to initialize core simulation.");
@@ -129,12 +129,6 @@ const SystemManager = {
         // Propagate to user interaction subsystems
         if (this.controller.userInteraction) {
             this.controller.userInteraction.propagateConstants();
-        }
-
-        // Propagate to chunk manager if initialized
-        if (this.controller.chunkManager) {
-            this.controller.chunkManager.setTypeEnum(this.controller.TYPE);
-            this.controller.chunkManager.setStateEnum(this.controller.STATE);
         }
 
         console.log("Constants propagated successfully");

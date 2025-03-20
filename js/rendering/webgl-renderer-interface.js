@@ -1,6 +1,5 @@
 // WebGL Renderer Interface Module
 // Main entry point to the rendering system, coordinating the various rendering modules
-// Enhanced to work with the chunk-based ecosystem
 
 window.WebGLRenderingSystem = {
     // References to other modules
@@ -14,8 +13,8 @@ window.WebGLRenderingSystem = {
     STATE: null,
 
     // Initialize the rendering system
-    init: function(core, canvasId, chunkManager) {
-        console.log("Initializing WebGL rendering system with chunk support...");
+    init: function(core, canvasId) {
+        console.log("Initializing WebGL rendering system...");
 
         // Store references to type and state enums
         this.TYPE = core.TYPE;
@@ -36,8 +35,7 @@ window.WebGLRenderingSystem = {
         }
 
         // Initialize renderer core (depends on all other modules)
-        // Pass chunkManager to enable chunk-based rendering
-        this.rendererCore = WebGLRendererCore.init(core, canvasId, chunkManager);
+        this.rendererCore = WebGLRendererCore.init(core, canvasId);
         if (!this.rendererCore) {
             console.error("Failed to initialize WebGL renderer core");
             return null;
@@ -59,14 +57,7 @@ window.WebGLRenderingSystem = {
 
     // Set visualization mode
     setVisualizationMode: function(mode) {
-        const success = this.visualizationManager.setMode(mode);
-
-        // Mark all chunks as needing re-rendering after visualization change
-        if (success && this.rendererCore.chunkVisibilityBuffers) {
-            this.rendererCore.chunkVisibilityBuffers.dirtyFlags.fill(1);
-        }
-
-        return success;
+        return this.visualizationManager.setMode(mode);
     },
 
     // Get current visualization mode
@@ -113,12 +104,5 @@ window.WebGLRenderingSystem = {
         this.rendererCore.setScaleFactor(scaleFactor);
 
         return scaleFactor;
-    },
-
-    // Toggle chunk-based rendering optimization
-    toggleChunkRendering: function(enabled) {
-        if (this.rendererCore) {
-            this.rendererCore.toggleChunkRendering(enabled);
-        }
     }
 };

@@ -52,9 +52,6 @@ window.ToolSystem = {
 
     // Apply tool at position with brush size
     applyTool: function(tool, x, y) {
-        // Get reference to controller for easier access to chunk manager
-        const controller = this.userInteraction.controller;
-
         // Apply in a circular area based on brush size
         const brushSize = this.userInteraction.brushSize;
         for (let dy = -brushSize; dy <= brushSize; dy++) {
@@ -74,11 +71,6 @@ window.ToolSystem = {
                         // Uses a smoother falloff curve
                         const intensity = Math.pow(1 - (distance / brushSize), 2);
                         this.applySingleTool(tool, nx, ny, index, intensity);
-
-                        // Mark as changed in the chunk system
-                        if (controller && controller.chunkManager) {
-                            controller.chunkManager.markChange(nx, ny);
-                        }
                     }
                 }
             }
@@ -120,9 +112,6 @@ window.ToolSystem = {
 
     // Apply water tool
     applyWaterTool: function(x, y, index, intensity) {
-        // Get reference to controller for chunk manager
-        const controller = this.userInteraction.controller;
-
         const settings = this.toolSettings.water;
         const waterAmount = Math.floor(settings.amount * intensity * settings.spreadFactor);
 
@@ -131,11 +120,6 @@ window.ToolSystem = {
             if (intensity > 0.3) {
                 this.core.type[index] = this.TYPE.WATER;
                 this.core.water[index] = Math.min(255, waterAmount);
-
-                // Mark as changed in chunk system
-                if (controller && controller.chunkManager) {
-                    controller.chunkManager.markChange(x, y);
-                }
             }
         } else if (this.core.type[index] === this.TYPE.SOIL) {
             // Add water to soil - soil absorbs water effectively
@@ -145,27 +129,14 @@ window.ToolSystem = {
             if (this.core.water[index] > 20) {
                 this.core.state[index] = this.STATE.WET;
             }
-
-            // Mark as changed in chunk system
-            if (controller && controller.chunkManager) {
-                controller.chunkManager.markChange(x, y);
-            }
         } else if (this.core.type[index] === this.TYPE.PLANT) {
             // Plants can absorb some water
             this.core.water[index] = Math.min(255, this.core.water[index] + Math.floor(waterAmount * 0.5));
-
-            // Mark as changed in chunk system
-            if (controller && controller.chunkManager) {
-                controller.chunkManager.markChange(x, y);
-            }
         }
     },
 
     // Apply seed tool
     applySeedTool: function(x, y, index, intensity) {
-        // Get reference to controller for chunk manager
-        const controller = this.userInteraction.controller;
-
         const settings = this.toolSettings.seed;
 
         // Plant seeds in air, soil, or on top of soil
@@ -205,11 +176,6 @@ window.ToolSystem = {
                 // Initialize the metadata counter to ensure gravity processing
                 this.core.metadata[index] = 0;
 
-                // Mark as changed in chunk system
-                if (controller && controller.chunkManager) {
-                    controller.chunkManager.markChange(x, y);
-                }
-
                 // Ensure this pixel becomes active immediately
                 if (window.ecosim && window.ecosim.activePixels) {
                     window.ecosim.activePixels.add(index);
@@ -220,9 +186,6 @@ window.ToolSystem = {
 
     // Apply dig tool
     applyDigTool: function(x, y, index, intensity) {
-        // Get reference to controller for chunk manager
-        const controller = this.userInteraction.controller;
-
         const settings = this.toolSettings.dig;
 
         // Digging effectiveness increases with intensity
@@ -240,11 +203,6 @@ window.ToolSystem = {
                     // Remove water
                     this.core.type[index] = this.TYPE.AIR;
                     this.core.water[index] = 0;
-
-                    // Mark as changed in chunk system
-                    if (controller && controller.chunkManager) {
-                        controller.chunkManager.markChange(x, y);
-                    }
                     break;
 
                 case this.TYPE.SOIL:
@@ -262,11 +220,6 @@ window.ToolSystem = {
                             this.core.nutrient[index] = Math.min(255, this.core.nutrient[index] + 20);
                         }
                     }
-
-                    // Mark as changed in chunk system
-                    if (controller && controller.chunkManager) {
-                        controller.chunkManager.markChange(x, y);
-                    }
                     break;
 
                 case this.TYPE.PLANT:
@@ -275,21 +228,11 @@ window.ToolSystem = {
                 case this.TYPE.WORM:
                     // Remove organisms, convert to dead matter
                     this.core.type[index] = this.TYPE.DEAD_MATTER;
-
-                    // Mark as changed in chunk system
-                    if (controller && controller.chunkManager) {
-                        controller.chunkManager.markChange(x, y);
-                    }
                     break;
 
                 case this.TYPE.DEAD_MATTER:
                     // Remove dead matter
                     this.core.type[index] = this.TYPE.AIR;
-
-                    // Mark as changed in chunk system
-                    if (controller && controller.chunkManager) {
-                        controller.chunkManager.markChange(x, y);
-                    }
                     break;
             }
         }
@@ -297,9 +240,6 @@ window.ToolSystem = {
 
     // Apply insect tool
     applyInsectTool: function(x, y, index, intensity) {
-        // Get reference to controller for chunk manager
-        const controller = this.userInteraction.controller;
-
         const settings = this.toolSettings.insect;
 
         // Only add insects to air, and with some randomness
@@ -315,11 +255,6 @@ window.ToolSystem = {
                 // Initialize the metadata counter to ensure gravity processing
                 this.core.metadata[index] = 0;
 
-                // Mark as changed in chunk system
-                if (controller && controller.chunkManager) {
-                    controller.chunkManager.markChange(x, y);
-                }
-
                 // Ensure this pixel becomes active immediately
                 if (window.ecosim && window.ecosim.activePixels) {
                     window.ecosim.activePixels.add(index);
@@ -330,9 +265,6 @@ window.ToolSystem = {
 
     // Apply worm tool
     applyWormTool: function(x, y, index, intensity) {
-        // Get reference to controller for chunk manager
-        const controller = this.userInteraction.controller;
-
         const settings = this.toolSettings.worm;
 
         // Worms can be added to soil or air
@@ -355,11 +287,6 @@ window.ToolSystem = {
                 // Initialize the metadata counter to ensure gravity processing
                 this.core.metadata[index] = 0;
 
-                // Mark as changed in chunk system
-                if (controller && controller.chunkManager) {
-                    controller.chunkManager.markChange(x, y);
-                }
-
                 // Ensure this pixel becomes active immediately
                 if (window.ecosim && window.ecosim.activePixels) {
                     window.ecosim.activePixels.add(index);
@@ -380,23 +307,6 @@ window.ToolSystem = {
         const nutrient = this.core.nutrient[index];
         const energy = this.core.energy[index];
 
-        // Get chunked ecosystem data if available
-        let chunkedData = null;
-        if (this.userInteraction.controller &&
-            this.userInteraction.controller.chunkManager &&
-            this.userInteraction.controller.chunkManager.chunkedEcosystem) {
-
-            const chunkedEco = this.userInteraction.controller.chunkManager.chunkedEcosystem;
-            chunkedData = {
-                type: chunkedEco.typeArray[index],
-                state: chunkedEco.stateArray[index],
-                water: chunkedEco.waterArray[index],
-                nutrient: chunkedEco.nutrientArray[index],
-                energy: chunkedEco.energyArray[index],
-                metadata: chunkedEco.metadataArray[index]
-            };
-        }
-
         // Log information about the observed pixel
         console.log("Observed pixel:", {
             position: { x, y },
@@ -404,8 +314,7 @@ window.ToolSystem = {
             state: this.getStateString(state),
             water: water,
             nutrient: nutrient,
-            energy: energy,
-            chunkedData: chunkedData
+            energy: energy
         });
 
         // Future enhancement: show tooltip or info panel with this data

@@ -1,4 +1,4 @@
-// Performance Manager - Tracks performance for chunk-based simulation
+// Performance Manager - Tracks performance and optimizes active pixels
 const PerformanceManager = {
     // Reference to main controller
     controller: null,
@@ -7,19 +7,9 @@ const PerformanceManager = {
     lastUpdate: 0,
     lastStatsUpdate: 0,
     fps: 0,
-    frameStartTime: 0,
 
-    // Chunk performance metrics
-    chunkPerformanceStats: {
-        activeChunks: 0,
-        totalChunks: 0,
-        processingPercent: 0,
-        averageUpdateTime: 0
-    },
-
-    // Update time tracking
-    updateTimes: [],
-    maxTrackingPoints: 30, // Store last 30 measurements for averaging
+    // Active pixel management
+    maxActivePixels: 100000, // Safety limit to prevent performance issues
 
     // Initialize performance manager
     init: function(controller) {
@@ -34,7 +24,6 @@ const PerformanceManager = {
         this.lastUpdate = performance.now();
         this.lastStatsUpdate = performance.now();
         this.fps = 60; // Initial estimate
-        this.updateTimes = [];
     },
 
     // Start timing a new frame
@@ -45,33 +34,41 @@ const PerformanceManager = {
     // End timing for the current frame and calculate FPS
     endFrame: function() {
         const currentTime = performance.now();
-        const frameDuration = currentTime - this.lastUpdate;
-
-        this.fps = 1000 / frameDuration;
+        this.fps = 1000 / (currentTime - this.lastUpdate);
         this.lastUpdate = currentTime;
+    },
 
-        // Track update time
-        const updateTime = currentTime - this.frameStartTime;
-        this.updateTimes.push(updateTime);
-
-        // Maintain fixed size for performance tracking
-        if (this.updateTimes.length > this.maxTrackingPoints) {
-            this.updateTimes.shift();
+    // Manage active pixels with performance considerations
+    manageActivePixels: function(pixelSet) {
+        // Safety check: limit active pixels to prevent performance issues
+        if (pixelSet.size > this.maxActivePixels) {
+            console.warn(`Too many active pixels (${pixelSet.size}), pruning to ${this.maxActivePixels}`);
+            this.pruneActivePixels(pixelSet);
         }
+    },
 
-        // Calculate average update time
-        const avgUpdateTime = this.updateTimes.reduce((sum, time) => sum + time, 0) / this.updateTimes.length;
+    // Prune active pixels when they exceed the maximum limit
+    pruneActivePixels: function(pixelSet) {
+        // Convert to array for easier manipulation
+        const pixelArray = Array.from(pixelSet);
 
-        // Update chunk performance stats
-        if (this.controller.chunkManager) {
-            this.chunkPerformanceStats.activeChunks =
-                this.controller.chunkManager.getActiveChunkCount();
-            this.chunkPerformanceStats.totalChunks =
-                this.controller.chunkManager.getTotalChunkCount();
-            this.chunkPerformanceStats.processingPercent =
-                (this.chunkPerformanceStats.activeChunks / this.chunkPerformanceStats.totalChunks * 100).toFixed(1);
-            this.chunkPerformanceStats.averageUpdateTime = avgUpdateTime.toFixed(2);
+        // Shuffle array to randomize which pixels are kept
+        this.shuffleArray(pixelArray);
+
+        // Clear the set and refill with max allowed pixels
+        pixelSet.clear();
+        for (let i = 0; i < this.maxActivePixels; i++) {
+            pixelSet.add(pixelArray[i]);
         }
+    },
+
+    // Fisher-Yates shuffle for arrays
+    shuffleArray: function(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
     },
 
     // Check if enough time has passed for stats update
@@ -87,20 +84,5 @@ const PerformanceManager = {
     // Get current FPS
     getFPS: function() {
         return Math.round(this.fps);
-    },
-
-    // Get active chunk count for display
-    getActiveChunkCount: function() {
-        return this.chunkPerformanceStats.activeChunks;
-    },
-
-    // Get processing percentage for display
-    getProcessingPercent: function() {
-        return this.chunkPerformanceStats.processingPercent;
-    },
-
-    // Get average update time
-    getAverageUpdateTime: function() {
-        return this.chunkPerformanceStats.averageUpdateTime;
     }
 };
