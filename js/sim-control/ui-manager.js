@@ -159,6 +159,14 @@ const UIManager = {
         if (activeCounter) {
             activeCounter.textContent = this.controller.activePixels.size;
         }
+
+        // Update chunk stats if using chunked processing
+        if (this.controller.useChunkedProcessing && this.controller.chunkManager) {
+            const chunkCounter = document.getElementById('chunk-counter');
+            if (chunkCounter) {
+                chunkCounter.textContent = `${this.controller.performanceManager.getActiveChunkCount()} (${this.controller.performanceManager.getProcessingPercent()}%)`;
+            }
+        }
     },
 
     // Update entity count statistics

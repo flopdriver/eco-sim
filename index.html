@@ -192,6 +192,7 @@
         <!-- Stats overlay -->
         <div class="stats-overlay">
             <div>FPS: <span id="fps-counter">60</span></div>
+            <div>Chunks: <span id="chunk-counter">0 (0%)</span></div>
             <div>Plants: <span id="plant-counter">0</span></div>
             <div>Insects: <span id="insect-counter">0</span></div>
             <div>Water: <span id="water-counter">0</span></div>
@@ -249,6 +250,10 @@
 <script src="js/rendering/webgl-renderer-interface.js"></script>
     <script src="js/rendering/zoom-controller.js"></script>
 <!-- End of WebGL Rendering System Components -->
+
+<!-- Chunk Optimisation -->
+<script src="js/sim-control/chunked-ecosystem.js"></script>
+<script src="js/sim-control/chunk-manager.js"></script>
 
 <!-- Simulation controller components -->
 <script src="js/sim-control/system-manager.js"></script>

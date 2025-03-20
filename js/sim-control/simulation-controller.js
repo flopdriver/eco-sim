@@ -26,6 +26,9 @@ const SimulationController = {
     TYPE: null,
     STATE: null,
 
+    chunkManager: null,
+    useChunkedProcessing: true, // Flag to enable/disable chunked processing
+
     init: function(canvasId) {
         console.log("Initializing simulation controller...");
 
@@ -64,6 +67,11 @@ const SimulationController = {
 
         // Initialize environmental-biological connections
         this.ecosystemBalancer.initializeEnvironmentalConnections();
+
+        // Initialize chunk manager if chunked processing is enabled
+        if (this.useChunkedProcessing) {
+            this.chunkManager = ChunkManager.init(this);
+        }
 
         console.log("Simulation initialization complete.");
         return this;
@@ -104,6 +112,12 @@ const SimulationController = {
         console.log("Starting simulation...");
         this.running = true;
         this.performanceManager.resetTiming();
+
+        // Initialize chunked system if needed
+        if (this.useChunkedProcessing && this.chunkManager) {
+            this.chunkManager.initialSync();
+        }
+
         requestAnimationFrame(() => this.update());
     },
 
@@ -150,34 +164,40 @@ const SimulationController = {
         this.start();
     },
 
-    // Main update loop
     update: function() {
         if (!this.running) return;
 
         // Track performance
         this.performanceManager.startFrame();
 
-        // Track pixels that will become active next frame
-        const nextActivePixels = new Set();
+        // Process active pixels
+        if (this.useChunkedProcessing && this.chunkManager) {
+            // Use chunked processing
+            this.chunkManager.update();
+        } else {
+            // Use original processing
+            // Track pixels that will become active next frame
+            const nextActivePixels = new Set();
 
-        // Run multiple update steps based on speed setting
-        for (let i = 0; i < this.simulationSpeed; i++) {
-            // Periodically update environmental-biological connections
-            if (i === 0 && Math.random() < 0.05) {
-                this.ecosystemBalancer.updateBiologicalRates();
+            // Run multiple update steps based on speed setting
+            for (let i = 0; i < this.simulationSpeed; i++) {
+                // Periodically update environmental-biological connections
+                if (i === 0 && Math.random() < 0.05) {
+                    this.ecosystemBalancer.updateBiologicalRates();
+                }
+
+                // Update each system in order:
+                this.environment.update(this.activePixels, nextActivePixels);
+                this.physics.update(this.activePixels, nextActivePixels);
+                this.biology.update(this.activePixels, nextActivePixels);
+
+                // Manage active pixels with performance considerations
+                this.performanceManager.manageActivePixels(nextActivePixels);
+
+                // Update active pixels for next iteration
+                this.activePixels = new Set(nextActivePixels);
+                nextActivePixels.clear();
             }
-
-            // Update each system in order:
-            this.environment.update(this.activePixels, nextActivePixels);
-            this.physics.update(this.activePixels, nextActivePixels);
-            this.biology.update(this.activePixels, nextActivePixels);
-
-            // Manage active pixels with performance considerations
-            this.performanceManager.manageActivePixels(nextActivePixels);
-
-            // Update active pixels for next iteration
-            this.activePixels = new Set(nextActivePixels);
-            nextActivePixels.clear();
         }
 
         // End timing for this frame
@@ -193,7 +213,7 @@ const SimulationController = {
         if (this.running) {
             requestAnimationFrame(() => this.update());
         }
-    }
+    },
 };
 
 // Initialize and start the simulation when the page loads
