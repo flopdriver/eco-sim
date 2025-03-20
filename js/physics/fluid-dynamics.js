@@ -4,6 +4,9 @@
 const FluidDynamicsSystem = {
     // Reference to parent physics system
     physics: null,
+    
+    // Water flow rate multiplier
+    waterFlowRate: 1.0,
 
     // Initialize fluid dynamics system
     init: function(physicsSystem) {
@@ -85,35 +88,83 @@ const FluidDynamicsSystem = {
                     break;
 
                 case this.physics.TYPE.PLANT:
-                    // Allow water to pass through plants with some probability
-                    // Different probabilities for different plant parts
-                    let passChance = 0.1; // Base chance
-
-                    // Adjust based on plant state (root, stem, leaf, etc.)
-                    switch (this.physics.core.state[downIndex]) {
-                        case this.physics.STATE.ROOT:
-                            passChance = 0.3; // Roots absorb water, but also let it pass
-                            break;
-                        case this.physics.STATE.STEM:
-                            passChance = 0.2; // Stems let some water pass
-                            break;
-                        case this.physics.STATE.LEAF:
-                            passChance = 0.05; // Leaves block most water
-                            break;
-                        default:
-                            passChance = 0.1;
+                    // Plants mostly block water, but interact with it differently
+                    // based on plant part
+                    const plantState = this.physics.core.state[downIndex];
+                    
+                    // Roots can absorb water without displacement
+                    if (plantState === this.physics.STATE.ROOT) {
+                        if (Math.random() < 0.3) {
+                            // Roots absorb some water without moving the plant
+                            const absorbAmount = Math.min(10, this.physics.core.water[index]);
+                            this.physics.core.water[downIndex] += absorbAmount;
+                            this.physics.core.water[index] -= absorbAmount;
+                            
+                            // If water is depleted, convert to air
+                            if (this.physics.core.water[index] <= 0) {
+                                this.physics.core.type[index] = this.physics.TYPE.AIR;
+                            }
+                            
+                            // Activate both pixels
+                            nextActivePixels.add(index);
+                            nextActivePixels.add(downIndex);
+                            return;
+                        }
                     }
-
-                    if (Math.random() < passChance) {
-                        // Water passes through the plant
-                        this.swapWaterWithElement(index, downIndex, nextActivePixels);
+                    // Stems can let water pass through, but rarely
+                    else if (plantState === this.physics.STATE.STEM) {
+                        if (Math.random() < 0.05) {
+                            // Water can occasionally pass through stems
+                            // But use special handling to preserve plant structure
+                            
+                            // Get the pixel below the stem
+                            const belowStemIndex = this.physics.core.getIndex(x, y + 2);
+                            if (belowStemIndex !== -1 && 
+                                (this.physics.core.type[belowStemIndex] === this.physics.TYPE.AIR ||
+                                 this.physics.core.type[belowStemIndex] === this.physics.TYPE.WATER)) {
+                                 
+                                // Move water through the stem to the pixel below
+                                if (this.physics.core.type[belowStemIndex] === this.physics.TYPE.AIR) {
+                                    this.physics.core.type[belowStemIndex] = this.physics.TYPE.WATER;
+                                    this.physics.core.water[belowStemIndex] = this.physics.core.water[index];
+                                } else {
+                                    // Add water to existing water
+                                    this.physics.core.water[belowStemIndex] += this.physics.core.water[index];
+                                }
+                                
+                                // Convert original water to air
+                                this.physics.core.type[index] = this.physics.TYPE.AIR;
+                                this.physics.core.water[index] = 0;
+                                
+                                // Activate all three pixels
+                                nextActivePixels.add(index);
+                                nextActivePixels.add(downIndex);
+                                nextActivePixels.add(belowStemIndex);
+                                return;
+                            }
+                        }
+                    }
+                    // Leaves mostly block water completely
+                    else if (plantState === this.physics.STATE.LEAF) {
+                        // Water pools on leaves (no passing through)
+                        // But can occasionally "wet" the leaf
+                        if (Math.random() < 0.1) {
+                            // Increase water content of leaf slightly
+                            this.physics.core.water[downIndex] += 1;
+                            nextActivePixels.add(downIndex);
+                        }
+                        nextActivePixels.add(index);
                         return;
                     }
-                    break;
+                    
+                    // Default case - water doesn't pass through plant
+                    nextActivePixels.add(index);
+                    return;
 
                 case this.physics.TYPE.INSECT:
                     // Allow water to pass through insects with small probability
-                    if (Math.random() < 0.15) {
+                    // Modified by waterFlowRate setting
+                    if (Math.random() < 0.10 * this.waterFlowRate) {
                         this.swapWaterWithElement(index, downIndex, nextActivePixels);
                         return;
                     }

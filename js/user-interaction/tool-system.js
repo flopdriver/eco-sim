@@ -41,6 +41,12 @@ window.ToolSystem = {
         this.core = userInteractionSystem.core;
         this.TYPE = userInteractionSystem.TYPE;
         this.STATE = userInteractionSystem.STATE;
+        
+        // Energy factor modifiers (used by UI sliders)
+        this.plantEnergyFactor = 1.0;
+        this.insectEnergyFactor = 1.0;
+        this.wormEnergyFactor = 1.0;
+        
         return this;
     },
 
@@ -133,25 +139,47 @@ window.ToolSystem = {
     applySeedTool: function(x, y, index, intensity) {
         const settings = this.toolSettings.seed;
 
-        // Only plant seeds in air or on soil
-        if (this.core.type[index] === this.TYPE.AIR) {
+        // Plant seeds in air, soil, or on top of soil
+        if (this.core.type[index] === this.TYPE.AIR || this.core.type[index] === this.TYPE.SOIL) {
             // Check if there's soil nearby (especially below)
             const belowIndex = this.core.getIndex(x, y + 1);
             const hasSoilBelow = belowIndex !== -1 && this.core.type[belowIndex] === this.TYPE.SOIL;
+            const isInSoil = this.core.type[index] === this.TYPE.SOIL;
 
-            // Higher chance to plant seed if on soil and high intensity
-            const chanceFactor = hasSoilBelow ? 1.5 : 1.0;
+            // Adjust chance factor based on where we're planting
+            let chanceFactor = 1.0;
+            if (isInSoil) {
+                // Higher chance when planting directly in soil (preferred)
+                chanceFactor = 2.0;
+            } else if (hasSoilBelow) {
+                // Slightly higher chance when on top of soil
+                chanceFactor = 1.5;
+            }
 
             // Place seed with probability based on intensity and settings
             if (Math.random() < settings.probability * intensity * chanceFactor) {
                 this.core.type[index] = this.TYPE.SEED;
                 this.core.state[index] = this.STATE.DEFAULT;
 
-                // Energy varies with intensity
-                this.core.energy[index] = Math.floor(settings.energy * (0.8 + 0.4 * intensity));
+                // Energy varies with intensity and plant energy factor
+                // Seeds planted in soil start with more energy
+                const energyBonus = isInSoil ? 1.3 : 1.0;
+                this.core.energy[index] = Math.floor(settings.energy * (0.8 + 0.4 * intensity) * this.plantEnergyFactor * energyBonus);
 
-                // Seeds contain some water
-                this.core.water[index] = 30;
+                // Seeds contain some water - more if planted in wet soil
+                if (isInSoil && this.core.water[index] > 20) {
+                    this.core.water[index] = Math.min(50, this.core.water[index]); 
+                } else {
+                    this.core.water[index] = 30;
+                }
+                
+                // Initialize the metadata counter to ensure gravity processing
+                this.core.metadata[index] = 0;
+                
+                // Ensure this pixel becomes active immediately
+                if (window.ecosim && window.ecosim.activePixels) {
+                    window.ecosim.activePixels.add(index);
+                }
             }
         }
     },
@@ -221,8 +249,16 @@ window.ToolSystem = {
                 this.core.type[index] = this.TYPE.INSECT;
                 this.core.state[index] = this.STATE.ADULT;
 
-                // Energy based on settings and intensity
-                this.core.energy[index] = Math.floor(settings.energy * (0.9 + 0.2 * intensity));
+                // Energy based on settings, intensity, and insect energy factor
+                this.core.energy[index] = Math.floor(settings.energy * (0.9 + 0.2 * intensity) * this.insectEnergyFactor);
+                
+                // Initialize the metadata counter to ensure gravity processing
+                this.core.metadata[index] = 0;
+                
+                // Ensure this pixel becomes active immediately
+                if (window.ecosim && window.ecosim.activePixels) {
+                    window.ecosim.activePixels.add(index);
+                }
             }
         }
     },
@@ -240,12 +276,20 @@ window.ToolSystem = {
             if (Math.random() < settings.probability * intensity * typeFactor) {
                 this.core.type[index] = this.TYPE.WORM;
 
-                // Energy based on settings and intensity
-                this.core.energy[index] = Math.floor(settings.energy * (0.8 + 0.4 * intensity));
+                // Energy based on settings, intensity, and worm energy factor
+                this.core.energy[index] = Math.floor(settings.energy * (0.8 + 0.4 * intensity) * this.wormEnergyFactor);
 
                 // Worms in soil get a nutrient bonus
                 if (this.core.type[index] === this.TYPE.SOIL) {
                     this.core.nutrient[index] = Math.min(255, this.core.nutrient[index] + 30);
+                }
+                
+                // Initialize the metadata counter to ensure gravity processing
+                this.core.metadata[index] = 0;
+                
+                // Ensure this pixel becomes active immediately
+                if (window.ecosim && window.ecosim.activePixels) {
+                    window.ecosim.activePixels.add(index);
                 }
             }
         }

@@ -56,9 +56,10 @@ const EnvironmentInitializer = {
 
         // Add plant seeds
         this.addInitialSeeds(groundLevel);
-
         // Add worms
         this.addInitialWorms(groundLevel);
+
+        this.addInitialInsects(groundLevel);
     },
 
     // Add initial seeds to the environment
@@ -106,6 +107,30 @@ const EnvironmentInitializer = {
             if (index !== -1 && core.type[index] === TYPE.SOIL) {
                 core.type[index] = TYPE.WORM;
                 core.energy[index] = 180; // Increased initial energy
+                activePixels.add(index);
+            }
+        }
+    },
+    
+    addInitialInsects: function(groundLevel) {
+        const core = this.controller.core;
+        const TYPE = this.controller.TYPE;
+        const STATE = this.controller.STATE;
+        const activePixels = this.controller.activePixels;
+
+        // Moderate number of initial insects - 5-8
+        const numInsects = 5 + Math.floor(Math.random() * 3);
+
+        for (let i = 0; i < numInsects; i++) {
+            const x = Math.floor(Math.random() * core.width);
+            const y = Math.floor(Math.random() * (groundLevel - 5));
+            const index = core.getIndex(x, y);
+
+            if (index !== -1 && core.type[index] === TYPE.AIR) {
+                core.type[index] = TYPE.INSECT;
+                core.state[index] = STATE.ADULT;
+                core.energy[index] = 130 + Math.floor(Math.random() * 40);
+                core.metadata[index] = 0; // Starvation counter
                 activePixels.add(index);
             }
         }

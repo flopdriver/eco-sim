@@ -14,8 +14,11 @@ const UIManager = {
     setupUI: function() {
         this.setupControlButtons();
         this.setupEnvironmentControls();
+        this.setupBiologyControls();
+        this.setupPhysicsControls();
         this.setupSimulationControls();
         this.setupVisualizationControls();
+        this.setupAdvancedPanels();
     },
 
     // Set up pause and reset buttons
@@ -222,5 +225,112 @@ const UIManager = {
             const isPrimarilyDay = this.controller.environment.dayNightCycle < 128;
             timeIndicator.textContent = isPrimarilyDay ? "Day" : "Night";
         }
+    },
+    
+    // Setup advanced panels toggle functionality
+    setupAdvancedPanels: function() {
+        // Environment advanced panel
+        this.setupPanelToggle('advanced-env-toggle', 'advanced-env-panel');
+        
+        // Species controls panel
+        this.setupPanelToggle('species-controls-toggle', 'species-controls-panel');
+    },
+    
+    // Helper to set up panel toggles
+    setupPanelToggle: function(toggleId, panelId) {
+        const toggleButton = document.getElementById(toggleId);
+        const panel = document.getElementById(panelId);
+        
+        if (toggleButton && panel) {
+            toggleButton.addEventListener('click', () => {
+                panel.classList.toggle('active');
+                toggleButton.textContent = panel.classList.contains('active') 
+                    ? 'Hide Advanced Settings' 
+                    : 'Advanced Settings';
+            });
+        }
+    },
+    
+    // Setup biology control sliders
+    setupBiologyControls: function() {
+        // Growth rate slider
+        this.setupSlider('growth-rate-slider', 'growth-rate-value', (value) => {
+            const rate = value / 100;
+            this.controller.biology.growthRate = rate;
+            return rate.toFixed(1);
+        });
+        
+        // Metabolism slider
+        this.setupSlider('metabolism-slider', 'metabolism-value', (value) => {
+            const rate = value / 100;
+            this.controller.biology.metabolism = rate;
+            return rate.toFixed(1);
+        });
+        
+        // Reproduction slider
+        this.setupSlider('reproduction-slider', 'reproduction-value', (value) => {
+            const rate = value / 100;
+            this.controller.biology.reproduction = rate;
+            return rate.toFixed(1);
+        });
+        
+        // Plant energy slider
+        this.setupSlider('plant-energy-slider', 'plant-energy-value', (value) => {
+            // Store the factor for use when creating plants
+            this.controller.userInteraction.toolSystem.plantEnergyFactor = value / 100;
+            return value + '%';
+        });
+        
+        // Insect energy slider
+        this.setupSlider('insect-energy-slider', 'insect-energy-value', (value) => {
+            // Store the factor for use when creating insects
+            this.controller.userInteraction.toolSystem.insectEnergyFactor = value / 100;
+            return value + '%';
+        });
+        
+        // Worm energy slider
+        this.setupSlider('worm-energy-slider', 'worm-energy-value', (value) => {
+            // Store the factor for use when creating worms
+            this.controller.userInteraction.toolSystem.wormEnergyFactor = value / 100;
+            return value + '%';
+        });
+        
+        // Decomposition rate slider
+        this.setupSlider('decomp-rate-slider', 'decomp-rate-value', (value) => {
+            const rate = value / 100;
+            this.controller.biology.decompositionSystem.decompositionRate = rate;
+            return rate.toFixed(1);
+        });
+    },
+    
+    // Setup physics control sliders
+    setupPhysicsControls: function() {
+        // Gravity strength slider
+        this.setupSlider('gravity-slider', 'gravity-value', (value) => {
+            const strength = value / 100;
+            this.controller.physics.gravitySystem.gravityStrength = strength;
+            return strength.toFixed(1);
+        });
+        
+        // Water flow rate slider
+        this.setupSlider('water-flow-slider', 'water-flow-value', (value) => {
+            const rate = value / 100;
+            this.controller.physics.fluidDynamics.waterFlowRate = rate;
+            return rate.toFixed(1);
+        });
+        
+        // Air flow rate slider
+        this.setupSlider('air-flow-slider', 'air-flow-value', (value) => {
+            const rate = value / 100;
+            this.controller.physics.airDynamics.airFlowRate = rate;
+            return rate.toFixed(1);
+        });
+        
+        // Erosion strength slider
+        this.setupSlider('erosion-slider', 'erosion-value', (value) => {
+            const strength = value / 100;
+            this.controller.physics.erosionSystem.erosionStrength = strength;
+            return strength.toFixed(1);
+        });
     }
 };

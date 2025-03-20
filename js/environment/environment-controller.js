@@ -9,7 +9,7 @@ const EnvironmentController = {
     dayNightCycle: 0,      // 0-255 representing time of day
     dayLength: 5,          // Length of day cycle (1-10 scale)
     temperature: 128,      // 0-255 representing temperature
-    rainProbability: 0.01, // Chance of rain per tick
+    rainProbability: 0.8, // Chance of rain per tick (massively increased for jungle-like environment)
 
     // Type and state enums (will be populated by controller)
     TYPE: null,
@@ -31,6 +31,11 @@ const EnvironmentController = {
         this.weatherSystem = WeatherSystem.init(this);
         this.lightSystem = LightSystem.init(this);
         this.temperatureSystem = TemperatureSystem.init(this);
+        
+        // Connect weather system with rendering systems
+        if (window.ColorMapper) {
+            window.ColorMapper.setWeatherSystem(this.weatherSystem);
+        }
 
         return this;
     },

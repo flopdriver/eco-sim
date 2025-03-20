@@ -2,7 +2,7 @@
 // Handles visualization modes and visualization-specific settings
 
 window.VisualizationManager = {
-    // Current visualization mode
+    // Current visualization mode - always use normal by default
     mode: 'normal', // normal, moisture, energy, nutrient
 
     // Available visualization modes

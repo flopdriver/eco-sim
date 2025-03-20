@@ -75,25 +75,56 @@ const EcosystemBalancer = {
 
     // Check ecosystem balance and apply corrections if needed
     checkEcosystemBalance: function(plantCount, insectCount, wormCount) {
-        // Calculate total active area (non-soil)
-        const totalActiveCells = this.controller.core.width * this.controller.core.height * 0.4; // Approx cells above ground
-
-        // Check plant domination
-        if (plantCount > totalActiveCells * 0.5 && insectCount < 10) {
-            // Plants taking over, but few insects - spawn some insects
-            this.spawnRandomInsects(3);
+        // More sophisticated population dynamics
+        const totalActiveCells = this.controller.core.width * this.controller.core.height * 0.4;
+        
+        // Track plant maturity by checking total plant energy
+        let totalPlantEnergy = 0;
+        let maturePlantCount = 0;
+        
+        // Sample plant cells to estimate maturity (checking all would be expensive)
+        const core = this.controller.core;
+        const TYPE = this.controller.TYPE;
+        const sampleSize = 100;
+        
+        for (let i = 0; i < sampleSize; i++) {
+            const x = Math.floor(Math.random() * core.width);
+            const y = Math.floor(Math.random() * core.height);
+            const index = core.getIndex(x, y);
+            
+            if (index !== -1 && core.type[index] === TYPE.PLANT) {
+                totalPlantEnergy += core.energy[index];
+                if (core.energy[index] > 100) {
+                    maturePlantCount++;
+                }
+            }
+        }
+        
+        // If too many plants and few insects, spawn more
+        if (plantCount > totalActiveCells * 0.4 && insectCount < 10) {
+            this.spawnRandomInsects(5 + Math.floor(plantCount / 50)); // Scale spawn with plant count
         }
 
-        // Check insect overpopulation
-        if (insectCount > plantCount * 0.5) {
-            // Too many insects for available plants - reduce reproduction
-            this.controller.biology.reproduction *= 0.9;
+        // More dynamic reproduction rate
+        if (insectCount > plantCount * 0.3) {
+            // Reduce reproduction if too many insects
+            this.controller.biology.reproduction *= 0.7;
+        } else if (insectCount < plantCount * 0.1) {
+            // Increase reproduction if too few insects
+            this.controller.biology.reproduction = Math.min(1.0, this.controller.biology.reproduction * 1.3);
         } else {
-            // Normalize reproduction rate back toward standard
+            // Normalize reproduction
             this.controller.biology.reproduction = Math.min(1.0, this.controller.biology.reproduction * 1.05);
         }
 
-        // Other balance mechanisms could be added here
+        // Strict population control logic
+        if (insectCount > plantCount * 0.1) {
+            // Increase insect death rate if overpopulated
+            this.controller.biology.metabolism *= 2.0;
+        } else {
+            // Normalize metabolism
+            this.controller.biology.metabolism = Math.max(0.5, this.controller.biology.metabolism * 0.85);
+        }
     },
 
     // Helper function to spawn random insects as a balancing mechanism

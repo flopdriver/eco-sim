@@ -4,6 +4,9 @@
 const ErosionSystem = {
     // Reference to parent physics system
     physics: null,
+    
+    // Erosion strength multiplier
+    erosionStrength: 1.0,
 
     // Initialize erosion system
     init: function(physicsSystem) {
@@ -34,8 +37,8 @@ const ErosionSystem = {
         for (const neighbor of neighbors) {
             if (this.physics.core.type[neighbor.index] === this.physics.TYPE.SOIL) {
                 // Erosion is more likely for soil with low nutrients
-                // and is affected by water content
-                const erosionChance = 0.001 * (100 + (this.physics.core.water[index] / 255));
+                // and is affected by water content and erosion strength setting
+                const erosionChance = 0.001 * (100 + (this.physics.core.water[index] / 255)) * this.erosionStrength;
 
                 if (Math.random() < erosionChance) {
                     // Erode the soil - convert to water

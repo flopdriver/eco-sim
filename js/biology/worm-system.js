@@ -37,8 +37,10 @@ const WormSystem = {
         // Mark as processed
         this.biology.processedThisFrame[index] = 1;
 
-        // Worms move through soil, eat dead matter, and aerate soil
+        // Calculate ground level (where soil starts)
+        const groundLevel = Math.floor(this.core.height * 0.6);
 
+        // Worms move through soil, eat dead matter, and aerate soil
         // First, check if worm has enough energy
         if (this.core.energy[index] <= 0) {
             // Worm dies and becomes fertile soil
@@ -59,8 +61,10 @@ const WormSystem = {
             }
         }
 
-        // Move through soil
-        this.moveWorm(x, y, index, nextActivePixels);
+        // Only allow worms to move in soil and below ground level
+        if (y >= groundLevel) {
+            this.moveWorm(x, y, index, nextActivePixels);
+        }
 
         // Worms remain active
         nextActivePixels.add(index);
@@ -97,44 +101,50 @@ const WormSystem = {
         return false;
     },
 
-    // Move worm through soil or other materials
+    // Move worm through soil
     moveWorm: function(x, y, index, nextActivePixels) {
         const possibleDirections = [];
 
-        // Worms can move in any direction but prefer soil
+        // Calculate ground level (where soil starts)
+        const groundLevel = Math.floor(this.core.height * 0.6);
+
+        // Get neighboring pixels
         const neighbors = this.core.getNeighborIndices(x, y);
 
         // Evaluate each neighbor
         for (const neighbor of neighbors) {
             let weight = 0;
 
-            switch (this.core.type[neighbor.index]) {
-                case this.TYPE.SOIL:
-                    // Prefer soil - higher weight
-                    weight = 10;
-                    // Prefer fertile soil even more
-                    if (this.core.state[neighbor.index] === this.STATE.FERTILE) {
-                        weight = 5;
-                    }
-                    // But wet soil is best for worms
-                    else if (this.core.state[neighbor.index] === this.STATE.WET) {
-                        weight = 15;
-                    }
-                    break;
+            // Ensure worm only moves in or near soil, and below ground level
+            if (neighbor.y >= groundLevel) {
+                switch (this.core.type[neighbor.index]) {
+                    case this.TYPE.SOIL:
+                        // Prefer soil - higher weight
+                        weight = 10;
+                        // Prefer fertile soil even more
+                        if (this.core.state[neighbor.index] === this.STATE.FERTILE) {
+                            weight = 15;
+                        }
+                        // Even more preference for wet soil
+                        else if (this.core.state[neighbor.index] === this.STATE.WET) {
+                            weight = 20;
+                        }
+                        break;
 
-                case this.TYPE.DEAD_MATTER:
-                    // Very high weight for dead matter (food)
-                    weight = 20;
-                    break;
+                    case this.TYPE.DEAD_MATTER:
+                        // Very high weight for dead matter (food)
+                        weight = 25;
+                        break;
 
-                case this.TYPE.AIR:
-                    // Can move through air but don't prefer it
-                    weight = 2;
-                    break;
+                    case this.TYPE.WORM:
+                        // Avoid moving to another worm pixel
+                        weight = 0;
+                        break;
 
-                default:
-                    // Can't move through other materials
-                    weight = 0;
+                    default:
+                        // Can't move through other materials
+                        weight = 0;
+                }
             }
 
             // If valid direction, add to possibilities
@@ -186,6 +196,9 @@ const WormSystem = {
                 if (originalType === this.TYPE.SOIL) {
                     // Keep nutrients but add some aeration benefit
                     this.core.nutrient[index] = originalNutrient + 5;
+                } else if (originalType === this.TYPE.DEAD_MATTER) {
+                    // Create fertile soil from dead matter
+                    this.core.nutrient[index] = 300;
                 } else {
                     // New soil starts with basic nutrients
                     this.core.nutrient[index] = 20;

@@ -10,9 +10,9 @@ const BiologySystem = {
     STATE: null,
 
     // Biology settings
-    growthRate: 1.0,        // Multiplier for organism growth rates
-    metabolism: 1.0,        // Energy consumption rate multiplier
-    reproduction: 1.0,      // Reproduction probability multiplier
+    growthRate: 4.5,        // Multiplier for organism growth rates (massively increased for Jumanji-like growth)
+    metabolism: 0.65,       // Energy consumption rate multiplier (decreased for sustained rapid growth)
+    reproduction: 5.0,      // Reproduction probability multiplier (dramatically increased)
 
     // Processing flags to avoid double updates
     processedThisFrame: null,

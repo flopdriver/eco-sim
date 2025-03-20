@@ -13,12 +13,29 @@ window.ColorMapper = {
         this.core = core;
         this.TYPE = TYPE;
         this.STATE = STATE;
+        this.weatherSystem = null; // Will be set by environment controller
         return this;
+    },
+    
+    // Set reference to weather system
+    setWeatherSystem: function(weatherSystem) {
+        this.weatherSystem = weatherSystem;
     },
 
     // Get color for a pixel based on its properties and current visualization mode
     getPixelColor: function(index) {
-        // Handle specialized visualization modes first
+        // Check for clouds first (using core.cloud array)
+        if (this.core.cloud && this.core.cloud[index] > 0) {
+            // This is a cloud pixel - always render clouds on top of everything
+            // Use a consistent color for each cloud pixel to avoid flickering
+            return {
+                r: 240,
+                g: 240,
+                b: 250
+            };
+        }
+        
+        // Handle specialized visualization modes
         if (VisualizationManager.getMode() !== 'normal') {
             return this.getSpecializedVisualizationColor(index);
         }
@@ -36,16 +53,16 @@ window.ColorMapper = {
         // Normal mode - color based on type and state
         switch (type) {
             case this.TYPE.AIR:
-                // Air color varies slightly with energy (sunlight) - softer blue
+                // Air color varies with energy (sunlight) - softer blue
                 const lightLevel = Math.min(1.0, energy / 150);
-                // More subtle sky blue with day/night influence
-                r = 140 + Math.floor(lightLevel * 70);
-                g = 180 + Math.floor(lightLevel * 40);
-                b = 230 + Math.floor(lightLevel * 20);
+                // More natural sky blue with day/night influence
+                r = 70 + Math.floor(lightLevel * 100);  // Reduced from 100
+                g = 130 + Math.floor(lightLevel * 70);   // Reduced from 180
+                b = 200 + Math.floor(lightLevel * 30);   // Reduced from 230, added light variation
                 // Add slight variation for more natural look
-                r += Math.floor(Math.random() * 10) - 5;
-                g += Math.floor(Math.random() * 10) - 5;
-                b += Math.floor(Math.random() * 10) - 5;
+                r += Math.floor(Math.random() * 15) - 7;
+                g += Math.floor(Math.random() * 15) - 7;
+                b += Math.floor(Math.random() * 15) - 7;
                 break;
 
             case this.TYPE.WATER:
@@ -86,9 +103,9 @@ window.ColorMapper = {
                         break;
                     default:
                         // Default brown with variation
-                        r = 120 + Math.floor(Math.random() * 15) - 7;
-                        g = 85 + Math.floor(Math.random() * 10) - 5;
-                        b = 55 + Math.floor(Math.random() * 10) - 5;
+                        r = 150 + Math.floor(Math.random() * 15) - 7;
+                        g = 120 + Math.floor(Math.random() * 10) - 5;
+                        b = 90 + Math.floor(Math.random() * 10) - 5;
                 }
                 break;
 
@@ -97,9 +114,11 @@ window.ColorMapper = {
                 switch (state) {
                     case this.STATE.ROOT:
                         // Roots - BRIGHTENED COLORS for better visibility against soil
-                        r = 160 - Math.floor(water * 0.2) + Math.floor(Math.random() * 10) - 5; // Increased from 140
-                        g = 120 + Math.floor(water * 0.1) + Math.floor(Math.random() * 10) - 5; // Increased from 100
-                        b = 80 + Math.floor(Math.random() * 8) - 4; // Increased from 60
+                        // Cap the water influence to prevent blue tinting with high water levels
+                        const cappedWater = Math.min(100, water); // Cap water value at 100 for color calculation
+                        r = 160 - Math.floor(cappedWater * 0.15) + Math.floor(Math.random() * 10) - 5; // Reduced water influence
+                        g = 120 + Math.floor(cappedWater * 0.05) + Math.floor(Math.random() * 10) - 5; // Reduced water influence
+                        b = 65 + Math.floor(Math.random() * 8) - 4; // Fixed base value, reduced from 80
                         break;
                     case this.STATE.STEM:
                         // Stems - BRIGHTENED COLORS
@@ -125,22 +144,81 @@ window.ColorMapper = {
                         }
                         break;
                     case this.STATE.FLOWER:
-                        // Flowers with more natural color variation
-                        if (Math.random() < 0.3) {
-                            // White/pale flowers
-                            r = 240 + Math.floor(Math.random() * 15);
-                            g = 240 + Math.floor(Math.random() * 15);
-                            b = 220 + Math.floor(Math.random() * 35);
-                        } else if (Math.random() < 0.5) {
-                            // Yellow/orange flowers - BRIGHTENED
-                            r = 240 + Math.floor(Math.random() * 15); // Increased from 220
-                            g = 200 + Math.floor(Math.random() * 45); // Increased from 180
-                            b = 50 + Math.floor(Math.random() * 30);
+                        // Enhanced flower visualization with distinct petal and center colors
+                        // Get coordinates for better color distribution
+                        const coords = this.core.getCoords(index);
+                        
+                        // Use a deterministic "random" value based on position
+                        // This ensures specific flowers maintain their color
+                        const flowerSeed = ((coords.x * 7) + (coords.y * 13)) % 5;
+                        
+                        // Check if it's a flower center (has stem connections) or petal
+                        let isCenter = false;
+                        const neighbors = this.core.getNeighborIndices(coords.x, coords.y);
+                        for (const neighbor of neighbors) {
+                            if (this.core.type[neighbor.index] === this.TYPE.PLANT && 
+                                this.core.state[neighbor.index] === this.STATE.STEM) {
+                                isCenter = true;
+                                break;
+                            }
+                        }
+                        
+                        // Flower colors based on position-based seed
+                        if (flowerSeed === 0) {
+                            // Red/pink flowers
+                            if (isCenter) {
+                                r = 200 + Math.floor(Math.random() * 20);
+                                g = 40 + Math.floor(Math.random() * 20);
+                                b = 60 + Math.floor(Math.random() * 20);
+                            } else {
+                                r = 240 + Math.floor(Math.random() * 15);
+                                g = 80 + Math.floor(Math.random() * 30);
+                                b = 100 + Math.floor(Math.random() * 30);
+                            }
+                        } else if (flowerSeed === 1) {
+                            // Purple flowers
+                            if (isCenter) {
+                                r = 130 + Math.floor(Math.random() * 20);
+                                g = 30 + Math.floor(Math.random() * 20);
+                                b = 180 + Math.floor(Math.random() * 20);
+                            } else {
+                                r = 180 + Math.floor(Math.random() * 30);
+                                g = 60 + Math.floor(Math.random() * 30);
+                                b = 230 + Math.floor(Math.random() * 25);
+                            }
+                        } else if (flowerSeed === 2) {
+                            // White flowers
+                            if (isCenter) {
+                                r = 200 + Math.floor(Math.random() * 20);
+                                g = 200 + Math.floor(Math.random() * 20);
+                                b = 120 + Math.floor(Math.random() * 20);
+                            } else {
+                                r = 240 + Math.floor(Math.random() * 15);
+                                g = 240 + Math.floor(Math.random() * 15);
+                                b = 220 + Math.floor(Math.random() * 20);
+                            }
+                        } else if (flowerSeed === 3) {
+                            // Yellow flowers
+                            if (isCenter) {
+                                r = 200 + Math.floor(Math.random() * 20);
+                                g = 180 + Math.floor(Math.random() * 20);
+                                b = 30 + Math.floor(Math.random() * 20);
+                            } else {
+                                r = 250 + Math.floor(Math.random() * 5);
+                                g = 230 + Math.floor(Math.random() * 20);
+                                b = 70 + Math.floor(Math.random() * 30);
+                            }
                         } else {
-                            // Pink/purple flowers - BRIGHTENED
-                            r = 220 + Math.floor(Math.random() * 35); // Increased from 180
-                            g = 100 + Math.floor(Math.random() * 40);
-                            b = 200 + Math.floor(Math.random() * 55); // Increased from 150
+                            // Blue flowers
+                            if (isCenter) {
+                                r = 40 + Math.floor(Math.random() * 20);
+                                g = 80 + Math.floor(Math.random() * 20);
+                                b = 180 + Math.floor(Math.random() * 20);
+                            } else {
+                                r = 70 + Math.floor(Math.random() * 30);
+                                g = 120 + Math.floor(Math.random() * 30);
+                                b = 240 + Math.floor(Math.random() * 15);
+                            }
                         }
                         break;
                     default:

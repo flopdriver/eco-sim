@@ -9,6 +9,9 @@ const DecompositionSystem = {
     core: null,
     TYPE: null,
     STATE: null,
+    
+    // Decomposition settings
+    decompositionRate: 1.0,  // Global multiplier for decomposition speed
 
     // Initialize decomposition system
     init: function(biologySystem) {
@@ -39,62 +42,82 @@ const DecompositionSystem = {
 
         // Dead matter gradually decomposes into nutrients
 
+        // Check if this dead matter has decomposition progress tracked
+        if (!this.core.metadata[index]) {
+            // Initialize decomposition progress (0-100)
+            this.core.metadata[index] = 0;
+        }
+
         // First, check if there's soil or water below (for gravity)
         const downIndex = this.core.getIndex(x, y + 1);
 
-        if (downIndex !== -1) {
-            if (this.core.type[downIndex] === this.TYPE.SOIL) {
-                // Decompose into the soil below
-                if (Math.random() < 0.05) {
-                    // Add nutrients to soil
-                    this.core.nutrient[downIndex] += 20;
+        // Environmental factors that affect decomposition
+        let decompositionRate = 1.0; // Base rate
 
-                    // Make soil fertile
-                    this.core.state[downIndex] = this.STATE.FERTILE;
+        // Check surrounding pixels for factors that speed up decomposition
+        const neighbors = this.core.getNeighborIndices(x, y);
+        
+        // Count factors that affect decomposition
+        let waterCount = 0;
+        let wormCount = 0;
+        let soilCount = 0;
 
-                    // Remove dead matter
-                    this.core.type[index] = this.TYPE.AIR;
-
-                    nextActivePixels.add(downIndex);
-                    return;
-                }
-            } else if (this.core.type[downIndex] === this.TYPE.WATER) {
-                // Decompose into the water below (slower)
-                if (Math.random() < 0.02) {
-                    // Add nutrients to water
-                    this.core.nutrient[downIndex] += 10;
-
-                    // Remove dead matter
-                    this.core.type[index] = this.TYPE.AIR;
-
-                    nextActivePixels.add(downIndex);
-                    return;
+        for (const neighbor of neighbors) {
+            if (this.core.type[neighbor.index] === this.TYPE.WATER) {
+                waterCount++;
+            } else if (this.core.type[neighbor.index] === this.TYPE.WORM) {
+                wormCount++;
+            } else if (this.core.type[neighbor.index] === this.TYPE.SOIL) {
+                soilCount++;
+                // Wet soil speeds up decomposition even more
+                if (this.core.state[neighbor.index] === this.STATE.WET) {
+                    decompositionRate += 0.2;
                 }
             }
         }
 
-        // Decomposition is faster when wet
-        // Check if there's water nearby
-        const neighbors = this.core.getNeighborIndices(x, y);
-        const hasWaterNearby = neighbors.some(n => this.core.type[n.index] === this.TYPE.WATER);
+        // Water significantly speeds up decomposition
+        decompositionRate += waterCount * 0.3;
+        
+        // Worms dramatically speed up decomposition
+        decompositionRate += wormCount * 0.5;
+        
+        // Contact with soil speeds up decomposition slightly
+        decompositionRate += soilCount * 0.1;
 
-        // Chance to decompose in place
-        let decomposeChance = 0.01; // Base chance
-        if (hasWaterNearby) {
-            decomposeChance = 0.03; // Higher with water
-        }
+        // Advance decomposition based on rate and global decomposition rate
+        this.core.metadata[index] += Math.max(1, Math.floor(decompositionRate * this.decompositionRate));
 
-        if (Math.random() < decomposeChance) {
-            // Convert to fertile soil
-            this.core.type[index] = this.TYPE.SOIL;
-            this.core.state[index] = this.STATE.FERTILE;
-            this.core.nutrient[index] = 30;
-
-            nextActivePixels.add(index);
+        // Check if decomposition is complete
+        if (this.core.metadata[index] >= 100) {
+            // Fully decomposed - convert to appropriate type
+            if (downIndex !== -1 && this.core.type[downIndex] === this.TYPE.SOIL) {
+                // If above soil, add nutrients to soil below
+                this.core.nutrient[downIndex] += 20 + Math.floor(Math.random() * 10);
+                this.core.state[downIndex] = this.STATE.FERTILE;
+                this.core.type[index] = this.TYPE.AIR;
+                nextActivePixels.add(downIndex);
+            } else if (downIndex !== -1 && this.core.type[downIndex] === this.TYPE.WATER) {
+                // If above water, add nutrients to water below
+                this.core.nutrient[downIndex] += 10 + Math.floor(Math.random() * 5);
+                this.core.type[index] = this.TYPE.AIR;
+                nextActivePixels.add(downIndex);
+            } else {
+                // Convert to fertile soil in place
+                this.core.type[index] = this.TYPE.SOIL;
+                this.core.state[index] = this.STATE.FERTILE;
+                this.core.nutrient[index] = 25 + Math.floor(Math.random() * 10);
+                nextActivePixels.add(index);
+            }
             return;
         }
 
-        // Dead matter remains active
+        // Visual change during decomposition - make dead matter look more decomposed
+        // By adjusting energy value for visuals (assuming it affects rendering)
+        const decompositionProgress = this.core.metadata[index] / 100;
+        this.core.energy[index] = Math.max(0, 100 - (decompositionProgress * 100));
+
+        // Dead matter remains active while decomposing
         nextActivePixels.add(index);
     }
 };

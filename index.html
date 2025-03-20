@@ -11,65 +11,14 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌱</text></svg>">
 </head>
 <body>
-<div class="page-container">
-    <header>
-        <h1>Pixel Ecosystem Simulation</h1>
-        <p class="subtitle">A true pixel-based ecosystem where plants, insects, water, and soil interact through emergent behaviors. Watch a complete ecosystem develop before your eyes.</p>
-    </header>
-
-    <div class="webgl-error" id="webgl-error">
-        <strong>WebGL Not Supported</strong> - Your browser does not support WebGL, which is required for this simulation. Please try a different browser.
-    </div>
-
-    <div class="simulation-container">
-        <!-- Left tools panel -->
-        <div class="controls-panel left-panel">
-            <div class="control-group">
-                <h3>Tools</h3>
-                <div class="tools">
-                    <div class="tool-button active" data-tool="water">Water</div>
-                    <div class="tool-button" data-tool="seed">Plant Seed</div>
-                    <div class="tool-button" data-tool="dig">Dig</div>
-                    <div class="tool-button" data-tool="insect">Add Insect</div>
-                    <div class="tool-button" data-tool="worm">Add Worm</div>
-                    <div class="tool-button" data-tool="observe">Observe</div>
-                </div>
-                <div class="slider-control">
-                    <label>
-                        <span>Brush Size</span>
-                        <span id="brush-value">3px</span>
-                    </label>
-                    <input type="range" id="brush-slider" min="1" max="10" value="3">
-                </div>
-            </div>
-
-            <div class="control-group">
-                <h3>Environment</h3>
-                <div class="slider-control">
-                    <label>
-                        <span>Rain Frequency</span>
-                        <span id="rain-value">50%</span>
-                    </label>
-                    <input type="range" id="rain-slider" min="0" max="100" value="50">
-                </div>
-                <div class="slider-control">
-                    <label>
-                        <span>Temperature</span>
-                        <span id="temp-value">Normal</span>
-                    </label>
-                    <input type="range" id="temp-slider" min="0" max="100" value="50">
-                </div>
-                <div class="slider-control">
-                    <label>
-                        <span>Day Length</span>
-                        <span id="day-value">Normal</span>
-                    </label>
-                    <input type="range" id="day-slider" min="1" max="10" value="5">
-                </div>
-            </div>
+    <!-- Full-width banner simulation container -->
+    <div class="simulation-banner">
+        <!-- WebGL error message -->
+        <div class="webgl-error" id="webgl-error">
+            <strong>WebGL Not Supported</strong> - Your browser does not support WebGL, which is required for this simulation. Please try a different browser.
         </div>
 
-        <!-- Main simulation canvas (center) -->
+        <!-- Main simulation canvas -->
         <div class="canvas-container">
             <canvas id="ecosystem-canvas"></canvas>
 
@@ -78,112 +27,157 @@
                 <div class="loading-spinner"></div>
                 <p>Initializing Ecosystem...</p>
             </div>
-
-            <!-- Simulation controls - beneath the canvas -->
-            <div class="sim-controls">
-                <button class="button-control" id="pause-button">Pause</button>
-                <button class="button-control" id="reset-button">Reset</button>
-                <div class="slider-control horizontal">
+            
+            <!-- Overlaid tool controls panel -->
+            <div class="control-panel tools-panel">
+                <div class="panel-title">Tools</div>
+                <div class="tool-buttons">
+                    <div class="tool-button active" data-tool="water">
+                        <span class="tool-icon">💧</span>
+                    </div>
+                    <div class="tool-button" data-tool="seed">
+                        <span class="tool-icon">🌱</span>
+                    </div>
+                    <div class="tool-button" data-tool="dig">
+                        <span class="tool-icon">🪨</span>
+                    </div>
+                    <div class="tool-button" data-tool="insect">
+                        <span class="tool-icon">🐞</span>
+                    </div>
+                    <div class="tool-button" data-tool="worm">
+                        <span class="tool-icon">🪱</span>
+                    </div>
+                    <div class="tool-button" data-tool="observe">
+                        <span class="tool-icon">🔍</span>
+                    </div>
+                </div>
+                <div class="slider-control mini">
                     <label>
-                        <span>Speed</span>
-                        <span id="speed-value">1x</span>
+                        <span>Brush</span>
+                        <span id="brush-value">3</span>
                     </label>
-                    <input type="range" id="speed-slider" min="1" max="10" value="1">
+                    <input type="range" id="brush-slider" min="1" max="10" value="3">
+                </div>
+            </div>
+            
+            <!-- Overlaid environment controls panel -->
+            <div class="control-panel env-panel">
+                <div class="panel-title">Environment</div>
+                <div class="slider-control mini">
+                    <label>
+                        <span>Rain</span>
+                        <span id="rain-value">50%</span>
+                    </label>
+                    <input type="range" id="rain-slider" min="0" max="100" value="50">
+                </div>
+                <div class="slider-control mini">
+                    <label>
+                        <span>Temp</span>
+                        <span id="temp-value">50</span>
+                    </label>
+                    <input type="range" id="temp-slider" min="0" max="100" value="50">
+                </div>
+                <div class="slider-control mini">
+                    <label>
+                        <span>Day</span>
+                        <span id="day-value">5</span>
+                    </label>
+                    <input type="range" id="day-slider" min="1" max="10" value="5">
+                </div>
+            </div>
+            
+            <!-- Overlaid biology controls panel -->
+            <div class="control-panel bio-panel">
+                <div class="panel-title">Biology</div>
+                <div class="slider-control mini">
+                    <label>
+                        <span>Growth</span>
+                        <span id="growth-rate-value">1.0</span>
+                    </label>
+                    <input type="range" id="growth-rate-slider" min="0" max="200" value="100">
+                </div>
+                <div class="slider-control mini">
+                    <label>
+                        <span>Energy</span>
+                        <span id="metabolism-value">1.0</span>
+                    </label>
+                    <input type="range" id="metabolism-slider" min="0" max="200" value="100">
+                </div>
+                <div class="slider-control mini">
+                    <label>
+                        <span>Repro</span>
+                        <span id="reproduction-value">1.0</span>
+                    </label>
+                    <input type="range" id="reproduction-slider" min="0" max="200" value="100">
+                </div>
+            </div>
+            
+            <!-- Overlaid physics controls panel -->
+            <div class="control-panel physics-panel">
+                <div class="panel-title">Physics</div>
+                <div class="slider-control mini">
+                    <label>
+                        <span>Gravity</span>
+                        <span id="gravity-value">1.0</span>
+                    </label>
+                    <input type="range" id="gravity-slider" min="25" max="200" value="100">
+                </div>
+                <div class="slider-control mini">
+                    <label>
+                        <span>Water</span>
+                        <span id="water-flow-value">1.0</span>
+                    </label>
+                    <input type="range" id="water-flow-slider" min="25" max="200" value="100">
+                </div>
+                <div class="slider-control mini">
+                    <label>
+                        <span>Erosion</span>
+                        <span id="erosion-value">1.0</span>
+                    </label>
+                    <input type="range" id="erosion-slider" min="25" max="200" value="100">
+                </div>
+            </div>
+            
+            <!-- Overlaid visualization controls panel -->
+            <div class="control-panel viz-panel">
+                <div class="panel-title">View</div>
+                <div class="viz-buttons">
+                    <div class="viz-button active" data-mode="normal">
+                        <span class="viz-icon">🌍</span>
+                    </div>
+                    <div class="viz-button" data-mode="moisture">
+                        <span class="viz-icon">💦</span>
+                    </div>
+                    <div class="viz-button" data-mode="energy">
+                        <span class="viz-icon">⚡</span>
+                    </div>
+                    <div class="viz-button" data-mode="nutrient">
+                        <span class="viz-icon">🍃</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sim controls overlay -->
+            <div class="sim-controls-mini">
+                <button class="button-mini" id="pause-button">⏸️</button>
+                <button class="button-mini" id="reset-button">↻</button>
+                <div class="slider-control mini horizontal">
+                    <label>Speed</label>
+                    <input type="range" id="speed-slider" min="1" max="10" value="1" class="mini-slider">
+                    <span id="speed-value">1x</span>
                 </div>
             </div>
         </div>
-
-        <!-- Right tools panel -->
-        <div class="controls-panel right-panel">
-            <div class="control-group">
-                <h3>Visualization</h3>
-                <div class="visualization-modes">
-                    <div class="viz-button active" data-mode="normal">Normal</div>
-                    <div class="viz-button" data-mode="moisture">Moisture</div>
-                    <div class="viz-button" data-mode="energy">Energy</div>
-                    <div class="viz-button" data-mode="nutrient">Nutrients</div>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <h3>Stats</h3>
-                <div class="stats">
-                    <div>
-                        <span>FPS</span>
-                        <span id="fps-counter">60</span>
-                    </div>
-                    <div>
-                        <span>Active Pixels</span>
-                        <span id="active-counter">0</span>
-                    </div>
-                    <div>
-                        <span>Plants</span>
-                        <span id="plant-counter">0</span>
-                    </div>
-                    <div>
-                        <span>Insects</span>
-                        <span id="insect-counter">0</span>
-                    </div>
-                    <div>
-                        <span>Water Pixels</span>
-                        <span id="water-counter">0</span>
-                    </div>
-                    <div>
-                        <span>Time</span>
-                        <span id="day-night-indicator">Day</span>
-                    </div>
-                </div>
-            </div>
+        
+        <!-- Stats overlay -->
+        <div class="stats-overlay">
+            <div>FPS: <span id="fps-counter">60</span></div>
+            <div>Plants: <span id="plant-counter">0</span></div>
+            <div>Insects: <span id="insect-counter">0</span></div>
+            <div>Water: <span id="water-counter">0</span></div>
+            <div>Time: <span id="day-night-indicator">Day</span></div>
         </div>
     </div>
-
-    <div class="info-section">
-        <div class="info-title">
-            <h2>About This Ecosystem</h2>
-            <p>
-                This is a true pixel-based ecosystem simulation where every element is simulated at the individual pixel level.
-                Unlike sprite-based simulations, everything here emerges naturally from simple rules and
-                interactions between pixels, creating complex emergent behaviors.
-            </p>
-        </div>
-
-        <div class="info-grid">
-            <div class="info-card">
-                <h3>Plants</h3>
-                <p>Plants grow from seeds, developing roots to absorb water and nutrients, stems that reach for light, and leaves that perform photosynthesis. They produce seeds to reproduce when conditions are favorable.</p>
-            </div>
-
-            <div class="info-card">
-                <h3>Water</h3>
-                <p>Water flows realistically with gravity, can be absorbed by soil, and is transported through plants for growth. It evaporates in warm conditions and returns as rain, completing the water cycle.</p>
-            </div>
-
-            <div class="info-card">
-                <h3>Soil</h3>
-                <p>Soil holds moisture and nutrients. It can be dry, wet, or fertile, affecting plant growth and ecosystem health. Dead organisms decompose into soil, returning nutrients to the system.</p>
-            </div>
-
-            <div class="info-card">
-                <h3>Insects</h3>
-                <p>Insects move around, seeking plants to eat. They reproduce when they have enough energy and die when they don't. Their population naturally balances with the available plant life.</p>
-            </div>
-
-            <div class="info-card">
-                <h3>Worms</h3>
-                <p>Worms move through soil, eating dead matter and aerating the soil in the process. They improve soil fertility and help complete the decomposition cycle of the ecosystem.</p>
-            </div>
-
-            <div class="info-card">
-                <h3>Weather</h3>
-                <p>The simulation includes a day/night cycle, rain events, and temperature fluctuations that affect all organisms. These environmental factors create dynamic conditions that the ecosystem must adapt to.</p>
-            </div>
-        </div>
-    </div>
-
-    <footer>
-        <p>Pixel Ecosystem Simulation — A WebGL-based project showcasing emergent behaviors from simple pixel interactions.</p>
-    </footer>
-</div>
 
 <!-- Script imports -->
 <script src="js/core-simulation.js"></script>
@@ -201,10 +195,17 @@
 <script src="js/physics/soil-moisture.js"></script>
 <script src="js/physics/gravity-system.js"></script>
 <script src="js/physics/erosion-system.js"></script>
+<script src="js/physics/air-dynamics.js"></script>
 <script src="js/physics/physics-system.js"></script>
 
 <!-- Biology system components -->
-<script src="js/biology/plant-system.js"></script>
+<!-- Plant system modules -->
+<script src="js/biology/plant/plant-root-system.js"></script>
+<script src="js/biology/plant/plant-stem-system.js"></script>
+<script src="js/biology/plant/plant-leaf-system.js"></script>
+<script src="js/biology/plant/plant-flower-system.js"></script>
+<script src="js/biology/plant/plant-system.js"></script>
+<!-- Other biology modules -->
 <script src="js/biology/seed-system.js"></script>
 <script src="js/biology/insect-system.js"></script>
 <script src="js/biology/worm-system.js"></script>
@@ -238,7 +239,7 @@
 <!-- End of simulation controller components -->
 
 <script>
-    // Hide loading screen when everything is loaded
+    // UI enhancement script - manages the controls
     window.addEventListener('load', function() {
         // Short timeout to ensure all scripts are initialized
         setTimeout(function() {
@@ -255,34 +256,68 @@
                 errorElement.style.display = 'block';
             }
         }
-
-        // Setup event listeners for new UI elements
-        const autoBalanceCheckbox = document.getElementById('auto-balance');
-        if (autoBalanceCheckbox) {
-            autoBalanceCheckbox.addEventListener('change', function() {
-                if (window.ecosim && window.ecosim.ecosystemBalancer) {
-                    // Toggle auto-balance if implemented
-                    console.log('Auto-balance toggled:', this.checked);
+        
+        // Resize canvas to full window width
+        function resizeCanvas() {
+            const canvas = document.getElementById('ecosystem-canvas');
+            const container = document.querySelector('.canvas-container');
+            if (canvas && container) {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                container.style.width = window.innerWidth + 'px';
+                container.style.height = window.innerHeight + 'px';
+                
+                try {
+                    // If we have access to the renderer, update scale factor instead of pixel count
+                    if (window.WebGLRenderingSystem && window.WebGLRenderingSystem.rendererCore) {
+                        // Update the canvas size first
+                        WebGLRenderingSystem.resize(window.innerWidth, window.innerHeight);
+                        // Then update scale factor for the simulation
+                        WebGLRenderingSystem.updateScaleFactor(window.innerWidth, window.innerHeight);
+                    }
+                } catch (e) {
+                    console.warn("Could not resize canvas properly:", e);
+                }
+            }
+        }
+        
+        // Initial resize and add event listener
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Tool buttons functionality
+        const toolButtons = document.querySelectorAll('.tool-button');
+        toolButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Remove active class from all buttons
+                toolButtons.forEach(btn => btn.classList.remove('active'));
+                
+                // Add active class to clicked button
+                button.classList.add('active');
+                
+                // Set current tool
+                const tool = button.getAttribute('data-tool');
+                if (window.ecosim && window.ecosim.userInteraction) {
+                    window.ecosim.userInteraction.setTool(tool);
                 }
             });
-        }
-
-        const showDebugCheckbox = document.getElementById('show-debug');
-        if (showDebugCheckbox) {
-            showDebugCheckbox.addEventListener('change', function() {
-                // Toggle debug visualization if implemented
-                console.log('Debug info toggled:', this.checked);
-            });
-        }
-
-        const schemeButtons = document.querySelectorAll('.scheme-button');
-        schemeButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                schemeButtons.forEach(btn => btn.classList.remove('active'));
-                this.classList.add('active');
-                const scheme = this.getAttribute('data-scheme');
-                console.log('Color scheme changed:', scheme);
-                // Apply color scheme if implemented
+        });
+        
+        // Visualization buttons functionality
+        const vizButtons = document.querySelectorAll('.viz-button');
+        vizButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Remove active class from all buttons
+                vizButtons.forEach(btn => btn.classList.remove('active'));
+                
+                // Add active class to clicked button
+                button.classList.add('active');
+                
+                // Set visualization mode
+                const mode = button.getAttribute('data-mode');
+                if (window.ecosim && window.ecosim.rendering) {
+                    window.ecosim.rendering.setVisualizationMode(mode);
+                }
             });
         });
     });

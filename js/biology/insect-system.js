@@ -1,7 +1,7 @@
 // Insect System
-// Handles insect movement, feeding, and reproduction
-
+// Handles insect movement, feeding, and reproductio
 const InsectSystem = {
+
     // Reference to parent biology system
     biology: null,
 
@@ -40,22 +40,36 @@ const InsectSystem = {
         // Insects move, eat plants, and reproduce
         // They also need energy to survive
 
-        // First, check if insect has enough energy
-        if (this.core.energy[index] <= 0) {
-            // Insect dies
+        // Introduce a starvation counter
+        if (!this.core.metadata[index]) {
+            this.core.metadata[index] = 0; // Initialize starvation counter
+        }
+
+        // Significant energy consumption each tick
+        this.core.energy[index] -= 1 * this.biology.metabolism;
+
+        // If couldn't eat in previous ticks, increase starvation counter
+        if (this.core.energy[index] < 150) {
+            this.core.metadata[index]++; // Increment starvation counter
+        } else {
+            // Reset starvation counter if well-fed
+            this.core.metadata[index] = 0;
+        }
+
+        // Die quickly if not eating
+        if (this.core.metadata[index] > 1) {
             this.core.type[index] = this.TYPE.DEAD_MATTER;
             nextActivePixels.add(index);
             return;
         }
 
-        // Insects consume energy each tick
-        this.core.energy[index] -= 0.5 * this.biology.metabolism;
-
         // Decide action: move, eat, or reproduce based on needs
-        if (this.core.energy[index] < 50) {
+        if (this.core.energy[index] < 200) {
             // Low energy, prioritize eating
             if (this.tryEat(x, y, index, nextActivePixels)) {
-                return; // If successfully ate, don't do other actions
+                // Successfully ate, reset starvation counter
+                this.core.metadata[index] = 0;
+                return;
             }
 
             // If couldn't eat, try to move toward food
@@ -74,7 +88,6 @@ const InsectSystem = {
         nextActivePixels.add(index);
     },
 
-    // Try to eat plant material
     tryEat: function(x, y, index, nextActivePixels) {
         // Check all neighbors for plant material
         const neighbors = this.core.getNeighborIndices(x, y);
@@ -84,8 +97,8 @@ const InsectSystem = {
             // Choose a random plant neighbor
             const neighbor = plantNeighbors[Math.floor(Math.random() * plantNeighbors.length)];
 
-            // Eat the plant - convert to air and gain energy
-            const energyGain = 30 + Math.floor(this.core.energy[neighbor.index] / 2);
+            // More aggressive energy gain
+            const energyGain = 10 + Math.floor(this.core.energy[neighbor.index] / 1.2);
             this.core.energy[index] += energyGain;
 
             // Cap energy
@@ -93,12 +106,26 @@ const InsectSystem = {
                 this.core.energy[index] = 200;
             }
 
-            // Remove the plant
-            this.core.type[neighbor.index] = this.TYPE.AIR;
-            this.core.state[neighbor.index] = this.STATE.DEFAULT;
-            this.core.energy[neighbor.index] = 0;
-            this.core.water[neighbor.index] = 0;
+            // Very destructive plant consumption
+            switch (this.core.state[neighbor.index]) {
+                case this.STATE.LEAF:
+                    // Completely destroy leaf, high energy gain
+                    this.core.type[neighbor.index] = this.TYPE.AIR;
+                    this.core.energy[index] += 30;
+                    break;
+                case this.STATE.STEM:
+                    // Severely damage stem
+                    this.core.type[neighbor.index] = this.TYPE.AIR;
+                    this.core.energy[index] += 20;
+                    break;
+                case this.STATE.ROOT:
+                    // Moderate damage to roots
+                    this.core.energy[neighbor.index] = Math.floor(this.core.energy[neighbor.index] * 0.3);
+                    this.core.energy[index] += 10;
+                    break;
+            }
 
+            nextActivePixels.add(neighbor.index);
             return true;
         }
 
@@ -109,11 +136,14 @@ const InsectSystem = {
     moveInsect: function(x, y, index, nextActivePixels, seekingFood) {
         let possibleMoves = [];
 
-        // Get all possible moves (into air)
+        // Get all possible moves (into air or water)
         const neighbors = this.core.getNeighborIndices(x, y);
 
         for (const neighbor of neighbors) {
-            if (this.core.type[neighbor.index] === this.TYPE.AIR) {
+            // Can move into air and occasionally into water (if desperate)
+            if (this.core.type[neighbor.index] === this.TYPE.AIR || 
+                (this.core.type[neighbor.index] === this.TYPE.WATER && 
+                 (this.core.energy[index] < 50 || Math.random() < 0.2))) {
                 possibleMoves.push(neighbor);
             }
         }

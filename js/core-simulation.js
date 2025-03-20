@@ -19,6 +19,7 @@ const CoreSimulation = {
     nutrient: null, // Nutrient content (0-255)
     energy: null,   // Energy/light level (0-255)
     metadata: null, // Additional data for complex behaviors
+    cloud: null,    // Cloud data (0-255 for density)
 
     // Initialize core systems
     init: function() {
@@ -34,6 +35,7 @@ const CoreSimulation = {
         this.nutrient = new Uint8Array(this.size);
         this.energy = new Uint8Array(this.size);
         this.metadata = new Uint8Array(this.size);
+        this.cloud = new Uint8Array(this.size);
 
         return this;
     },

@@ -70,5 +70,31 @@ window.WebGLRenderingSystem = {
     // Resize the rendering canvas
     resize: function(width, height) {
         return this.rendererCore.resize(width, height);
+    },
+    
+    // Update scale factor for window resizing while keeping simulation size
+    updateScaleFactor: function(width, height) {
+        if (!this.rendererCore) {
+            console.warn("Renderer core not initialized yet");
+            return 1.0;
+        }
+        
+        // Check if base dimensions are available
+        if (!this.rendererCore.baseWidth) {
+            // Use default values if core simulation dimensions aren't set yet
+            this.rendererCore.baseWidth = 400;  // Default width
+            this.rendererCore.baseHeight = 300; // Default height
+        }
+        
+        // Calculate optimal scale factor based on window size
+        const scaleFactor = Math.min(
+            width / this.rendererCore.baseWidth,
+            height / this.rendererCore.baseHeight
+        );
+        
+        // Update the renderer with new scale factor
+        this.rendererCore.setScaleFactor(scaleFactor);
+        
+        return scaleFactor;
     }
 };
