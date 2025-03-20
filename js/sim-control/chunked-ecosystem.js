@@ -163,6 +163,9 @@ class ChunkedEcosystem {
         // Skip processing for empty/air pixels unless they're next to active pixels
         if (pixelType === 0 && !this.hasActiveNeighbor(x, y)) return;
 
+        // Mark the current pixel as a change to ensure all processed pixels are synced
+        this.changeArray[idx] = 1;
+
         // Apply simulation rules based on pixel type
         switch (pixelType) {
             case 1: // Soil
@@ -176,6 +179,15 @@ class ChunkedEcosystem {
                 break;
             case 4: // Insect
                 this.processInsect(x, y, idx);
+                break;
+            case 5: // Seed
+                this.processSeed(x, y, idx);
+                break;
+            case 6: // Dead Matter
+                this.processDeadMatter(x, y, idx);
+                break;
+            case 7: // Worm
+                this.processWorm(x, y, idx);
                 break;
         }
     }
@@ -192,6 +204,138 @@ class ChunkedEcosystem {
             }
         }
         return false;
+    }
+
+    // Process Seed
+    processSeed(x, y, idx) {
+        // Seeds can germinate or fall due to gravity
+
+        // Check if there's soil below
+        const downIdx = this.posToIndex(x, y + 1);
+        if (y < this.height - 1 && this.typeArray[downIdx] === 1) { // soil below
+            // Chance to germinate
+            if (this.waterArray[downIdx] > 20 && Math.random() < 0.05) {
+                this.typeArray[idx] = 3; // Convert to plant
+                this.stateArray[idx] = 4; // Root state
+                this.markChange(x, y);
+                return;
+            }
+        }
+
+        // Seeds fall due to gravity
+        if (y < this.height - 1 && (this.typeArray[downIdx] === 0 || this.typeArray[downIdx] === 2)) { // air or water below
+            // Move seed down
+            this.typeArray[downIdx] = 5; // Seed
+            this.energyArray[downIdx] = this.energyArray[idx];
+            this.typeArray[idx] = 0; // Air
+            this.energyArray[idx] = 0;
+            this.markChange(x, y);
+            this.markChange(x, y + 1);
+        }
+    }
+
+    // Process Dead Matter
+    processDeadMatter(x, y, idx) {
+        // Dead matter falls and decomposes
+
+        // Fall due to gravity
+        const downIdx = this.posToIndex(x, y + 1);
+        if (y < this.height - 1 && this.typeArray[downIdx] === 0) { // air below
+            // Move dead matter down
+            this.typeArray[downIdx] = 6; // Dead matter
+            this.energyArray[downIdx] = this.energyArray[idx];
+            this.typeArray[idx] = 0; // Air
+            this.energyArray[idx] = 0;
+            this.markChange(x, y);
+            this.markChange(x, y + 1);
+            return;
+        }
+
+        // Decompose gradually
+        if (Math.random() < 0.01) {
+            // Add to decomposition counter stored in metadata
+            this.metadataArray[idx] = (this.metadataArray[idx] || 0) + 1;
+
+            // If fully decomposed, convert to soil
+            if (this.metadataArray[idx] > 100) {
+                this.typeArray[idx] = 1; // Soil
+                this.stateArray[idx] = 3; // Fertile state
+                this.nutrientArray[idx] = 200;
+                this.markChange(x, y);
+            }
+        }
+    }
+
+    // Process Worm
+    processWorm(x, y, idx) {
+        // Worms move through soil and consume dead matter
+
+        // Reduce energy over time
+        this.energyArray[idx] -= 1;
+
+        // If no energy, die
+        if (this.energyArray[idx] <= 0) {
+            this.typeArray[idx] = 6; // Dead matter
+            this.markChange(x, y);
+            return;
+        }
+
+        // Move in soil
+        if (Math.random() < 0.3) {
+            // Get possible directions
+            const directions = [
+                { dx: 0, dy: 1 },  // Down
+                { dx: -1, dy: 0 }, // Left
+                { dx: 1, dy: 0 },  // Right
+                { dx: -1, dy: 1 }, // Down-left
+                { dx: 1, dy: 1 }   // Down-right
+            ];
+
+            // Shuffle directions for more random movement
+            this.shuffleArray(directions);
+
+            // Try each direction
+            for (const dir of directions) {
+                const nx = x + dir.dx;
+                const ny = y + dir.dy;
+
+                if (nx >= 0 && nx < this.width && ny >= 0 && ny < this.height) {
+                    const newIdx = this.posToIndex(nx, ny);
+
+                    // Worms can move through soil
+                    if (this.typeArray[newIdx] === 1) { // Soil
+                        // Move worm
+                        this.typeArray[newIdx] = 7; // Worm
+                        this.energyArray[newIdx] = this.energyArray[idx];
+
+                        // Leave aerated soil behind
+                        this.typeArray[idx] = 1; // Soil
+                        this.stateArray[idx] = 3; // Fertile
+                        this.nutrientArray[idx] = 200;
+
+                        this.markChange(x, y);
+                        this.markChange(nx, ny);
+                        return;
+                    }
+
+                    // Worms can consume dead matter
+                    if (this.typeArray[newIdx] === 6) { // Dead matter
+                        // Consume dead matter
+                        this.typeArray[newIdx] = 7; // Worm
+                        this.energyArray[newIdx] = this.energyArray[idx] + 50;
+
+                        // Leave fertile soil behind
+                        this.typeArray[idx] = 1; // Soil
+                        this.stateArray[idx] = 3; // Fertile
+                        this.nutrientArray[idx] = 200;
+
+                        this.markChange(x, y);
+                        this.markChange(nx, ny);
+                        return;
+                    }
+                }
+            }
+        }
     }
 
     // Example soil processing logic
@@ -243,11 +387,9 @@ class ChunkedEcosystem {
                 }
             }
         }
-
-        // Additional soil processes would go here (nutrient cycling, etc.)
     }
 
-    // Example water processing logic
+    // Process water movement
     processWater(x, y, idx) {
         // Water falls due to gravity
         if (y < this.height - 1) {
@@ -266,7 +408,7 @@ class ChunkedEcosystem {
                 return;
             }
 
-            // Flow into soil
+            // Flow into soil if not saturated
             if (this.typeArray[belowIdx] === 1 && this.waterArray[belowIdx] < 255) {
                 const transferAmount = Math.min(this.waterArray[idx], 255 - this.waterArray[belowIdx]);
 
@@ -275,7 +417,7 @@ class ChunkedEcosystem {
                 this.waterArray[idx] -= transferAmount;
 
                 // If all water transferred, change type to air
-                if (this.waterArray[idx] === 0) {
+                if (this.waterArray[idx] <= 0) {
                     this.typeArray[idx] = 0;
                 }
 
@@ -288,7 +430,7 @@ class ChunkedEcosystem {
 
         // Water spreads horizontally
         const directions = [[1, 0], [-1, 0]]; // Right, Left
-        directions.sort(() => Math.random() - 0.5); // Randomize direction
+        this.shuffleArray(directions); // Randomize direction
 
         for (const [dx, dy] of directions) {
             const nx = x + dx;
@@ -316,270 +458,266 @@ class ChunkedEcosystem {
             }
         }
 
-        // Evaporation logic would go here
+        // Occasional evaporation for surface water
+        if (y > 0 && this.typeArray[this.posToIndex(x, y-1)] === 0 && Math.random() < 0.001) {
+            this.waterArray[idx] -= 1;
+            if (this.waterArray[idx] <= 0) {
+                this.typeArray[idx] = 0; // Air
+                this.waterArray[idx] = 0;
+            }
+            this.markChange(x, y);
+        }
     }
 
-    // Example plant processing logic
+    // Process plant growth and behavior
     processPlant(x, y, idx) {
-        // Plant growth logic
+        // Photosynthesis and growth for plants
         const plantState = this.stateArray[idx];
 
-        // Check for resource availability
-        const hasWater = this.checkWaterAvailability(x, y);
-        const hasNutrients = this.checkNutrientAvailability(x, y);
-        const hasLight = y < this.height / 2; // Simplified light check
+        // Leaves convert light to energy
+        if (plantState === 6) { // Leaf
+            if (this.waterArray[idx] > 10) {
+                // Convert light to energy
+                this.energyArray[idx] += 1;
+                this.waterArray[idx] -= 0.2;
 
-        // Basic growth condition
-        if (hasWater && hasNutrients && hasLight) {
-            // Consume resources
-            this.consumeResources(x, y);
+                // Leaves have chance to grow more leaves or create flowers
+                if (Math.random() < 0.01 && this.energyArray[idx] > 100) {
+                    // Find air pixels nearby
+                    const directions = [[-1, 0], [1, 0], [0, -1], [-1, -1], [1, -1]];
+                    this.shuffleArray(directions);
 
-            // Growth chance
-            if (Math.random() < 0.1) {
-                this.attemptPlantGrowth(x, y, plantState);
-            }
-        }
+                    for (const [dx, dy] of directions) {
+                        const nx = x + dx;
+                        const ny = y + dy;
 
-        // Plant death if no resources
-        if (!hasWater && Math.random() < 0.05) {
-            // Plant dies
-            this.typeArray[idx] = 1; // Convert back to soil
-            this.stateArray[idx] = 0;
-            this.nutrientArray[idx] += 20; // Dead plants fertilize soil
+                        if (nx >= 0 && nx < this.width && ny >= 0 && ny < this.height) {
+                            const neighborIdx = this.posToIndex(nx, ny);
 
-            // Mark change
-            this.markChange(x, y);
-        }
-    }
+                            if (this.typeArray[neighborIdx] === 0) { // air
+                                if (Math.random() < 0.3) {
+                                    // Create flower
+                                    this.typeArray[neighborIdx] = 3; // Plant
+                                    this.stateArray[neighborIdx] = 7; // Flower
+                                } else {
+                                    // Create leaf
+                                    this.typeArray[neighborIdx] = 3; // Plant
+                                    this.stateArray[neighborIdx] = 6; // Leaf
+                                }
 
-    // Check for water availability to plant
-    checkWaterAvailability(x, y) {
-        // Look for water in surrounding soil pixels
-        for (let ny = y; ny <= Math.min(this.height - 1, y + 5); ny++) {
-            const checkIdx = this.posToIndex(x, ny);
+                                this.energyArray[neighborIdx] = this.energyArray[idx] / 2;
+                                this.energyArray[idx] = this.energyArray[idx] / 2;
+                                this.waterArray[neighborIdx] = this.waterArray[idx] / 2;
+                                this.waterArray[idx] = this.waterArray[idx] / 2;
 
-            // Check if it's soil with water
-            if (this.typeArray[checkIdx] === 1 && this.waterArray[checkIdx] > 20) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    // Check for nutrient availability
-    checkNutrientAvailability(x, y) {
-        // Look for nutrients in surrounding soil pixels
-        for (let ny = y; ny <= Math.min(this.height - 1, y + 5); ny++) {
-            const checkIdx = this.posToIndex(x, ny);
-
-            // Check if it's soil with nutrients
-            if (this.typeArray[checkIdx] === 1 && this.nutrientArray[checkIdx] > 10) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    // Consume resources for plant growth
-    consumeResources(x, y) {
-        for (let ny = y; ny <= Math.min(this.height - 1, y + 5); ny++) {
-            const checkIdx = this.posToIndex(x, ny);
-
-            // Reduce water in soil
-            if (this.typeArray[checkIdx] === 1 && this.waterArray[checkIdx] > 5) {
-                this.waterArray[checkIdx] -= 5;
-                this.markChange(x, ny);
-                break;
-            }
-        }
-
-        for (let ny = y; ny <= Math.min(this.height - 1, y + 5); ny++) {
-            const checkIdx = this.posToIndex(x, ny);
-
-            // Reduce nutrients in soil
-            if (this.typeArray[checkIdx] === 1 && this.nutrientArray[checkIdx] > 2) {
-                this.nutrientArray[checkIdx] -= 2;
-                this.markChange(x, ny);
-                break;
-            }
-        }
-    }
-
-    // Attempt to grow plant in available direction
-    attemptPlantGrowth(x, y, plantState) {
-        const growthDirections = [];
-
-        // Stems grow upward
-        if (plantState === 1) {
-            growthDirections.push([0, -1]); // Up
-            growthDirections.push([1, 0]);  // Right
-            growthDirections.push([-1, 0]); // Left
-        }
-        // Roots grow downward
-        else if (plantState === 2) {
-            growthDirections.push([0, 1]);  // Down
-            growthDirections.push([1, 1]);  // Down-Right
-            growthDirections.push([-1, 1]); // Down-Left
-        }
-
-        // Try growth in available directions
-        for (const [dx, dy] of growthDirections) {
-            const nx = x + dx;
-            const ny = y + dy;
-
-            if (nx >= 0 && nx < this.width && ny >= 0 && ny < this.height) {
-                const growthIdx = this.posToIndex(nx, ny);
-
-                // Only grow into empty space or soil (for roots)
-                if (this.typeArray[growthIdx] === 0 ||
-                    (this.typeArray[growthIdx] === 1 && plantState === 2)) {
-
-                    // Create new plant pixel
-                    this.typeArray[growthIdx] = 3; // Plant
-                    this.stateArray[growthIdx] = plantState;
-
-                    // Mark change
-                    this.markChange(nx, ny);
-                    break; // Only grow in one direction per tick
-                }
-            }
-        }
-    }
-
-    // Example insect processing logic
-    processInsect(x, y, idx) {
-        // Insects move and seek food
-        if (Math.random() < 0.3) { // 30% chance to move each tick
-            this.moveInsect(x, y, idx);
-        }
-
-        // Feeding logic
-        if (this.isNextToPlant(x, y)) {
-            this.energyArray[idx] = Math.min(255, this.energyArray[idx] + 10);
-            this.consumePlant(x, y);
-        }
-
-        // Energy consumption
-        this.energyArray[idx] = Math.max(0, this.energyArray[idx] - 1);
-
-        // Death from starvation
-        if (this.energyArray[idx] === 0 && Math.random() < 0.1) {
-            this.typeArray[idx] = 0; // Insect disappears
-            this.markChange(x, y);
-        }
-    }
-
-    // Move insect based on food-seeking behavior
-    moveInsect(x, y, idx) {
-        const possibleMoves = [];
-
-        // Check all adjacent pixels
-        for (let ny = Math.max(0, y - 1); ny <= Math.min(this.height - 1, y + 1); ny++) {
-            for (let nx = Math.max(0, x - 1); nx <= Math.min(this.width - 1, x + 1); nx++) {
-                if (nx === x && ny === y) continue;
-
-                const moveIdx = this.posToIndex(nx, ny);
-
-                // Can move to empty space or onto plants
-                if (this.typeArray[moveIdx] === 0 || this.typeArray[moveIdx] === 3) {
-                    // Prefer moving to plants when hungry
-                    const score = this.typeArray[moveIdx] === 3 ? 3 : 1;
-                    possibleMoves.push({ nx, ny, score });
-                }
-            }
-        }
-
-        // Sort moves by score and pick best option
-        if (possibleMoves.length > 0) {
-            possibleMoves.sort((a, b) => b.score - a.score);
-
-            // If low energy, strongly prefer food
-            if (this.energyArray[idx] < 50) {
-                // Filter for highest scoring moves
-                const bestScore = possibleMoves[0].score;
-                const bestMoves = possibleMoves.filter(move => move.score === bestScore);
-
-                // Pick random from best moves
-                const move = bestMoves[Math.floor(Math.random() * bestMoves.length)];
-                this.moveInsectTo(x, y, move.nx, move.ny);
-            } else {
-                // Random movement with weight toward good options
-                const totalScore = possibleMoves.reduce((sum, move) => sum + move.score, 0);
-                let targetScore = Math.random() * totalScore;
-
-                for (const move of possibleMoves) {
-                    targetScore -= move.score;
-                    if (targetScore <= 0) {
-                        this.moveInsectTo(x, y, move.nx, move.ny);
-                        break;
+                                this.markChange(nx, ny);
+                                break;
+                            }
+                        }
                     }
                 }
             }
         }
-    }
 
-    // Move insect to new position
-    moveInsectTo(x, y, nx, ny) {
-        const oldIdx = this.posToIndex(x, y);
-        const newIdx = this.posToIndex(nx, ny);
+        // Stems grow upward and can create leaves
+        else if (plantState === 5) { // Stem
+            if (this.energyArray[idx] > 80 && this.waterArray[idx] > 15 && Math.random() < 0.05) {
+                // Find air pixels for growth
+                const directions = [[0, -1], [-1, -1], [1, -1], [-1, 0], [1, 0]];
+                this.shuffleArray(directions);
 
-        // Eat plant if moving onto it
-        const isEating = this.typeArray[newIdx] === 3;
+                for (const [dx, dy] of directions) {
+                    const nx = x + dx;
+                    const ny = y + dy;
 
-        // Copy insect properties to new position
-        this.typeArray[newIdx] = 4; // Insect
-        this.stateArray[newIdx] = this.stateArray[oldIdx];
-        this.energyArray[newIdx] = this.energyArray[oldIdx];
-        this.metadataArray[newIdx] = this.metadataArray[oldIdx];
+                    if (nx >= 0 && nx < this.width && ny >= 0 && ny < this.height) {
+                        const neighborIdx = this.posToIndex(nx, ny);
 
-        // Clear old position
-        this.typeArray[oldIdx] = 0;
-        this.stateArray[oldIdx] = 0;
-        this.energyArray[oldIdx] = 0;
-        this.metadataArray[oldIdx] = 0;
+                        if (this.typeArray[neighborIdx] === 0) { // air
+                            if (dy === -1 && Math.random() < 0.7) { // Prefer growing upward
+                                // Create stem
+                                this.typeArray[neighborIdx] = 3; // Plant
+                                this.stateArray[neighborIdx] = 5; // Stem
+                            } else if (Math.random() < 0.4) {
+                                // Create leaf
+                                this.typeArray[neighborIdx] = 3; // Plant
+                                this.stateArray[neighborIdx] = 6; // Leaf
+                            }
 
-        // Mark changes
-        this.markChange(x, y);
-        this.markChange(nx, ny);
-    }
+                            this.energyArray[neighborIdx] = this.energyArray[idx] * 0.7;
+                            this.energyArray[idx] *= 0.7;
+                            this.waterArray[neighborIdx] = this.waterArray[idx] * 0.7;
+                            this.waterArray[idx] *= 0.7;
 
-    // Check if insect is next to a plant
-    isNextToPlant(x, y) {
-        for (let ny = Math.max(0, y - 1); ny <= Math.min(this.height - 1, y + 1); ny++) {
-            for (let nx = Math.max(0, x - 1); nx <= Math.min(this.width - 1, x + 1); nx++) {
-                if (nx === x && ny === y) continue;
-
-                const checkIdx = this.posToIndex(nx, ny);
-                if (this.typeArray[checkIdx] === 3) {
-                    return true;
+                            this.markChange(nx, ny);
+                            break;
+                        }
+                    }
                 }
             }
         }
-        return false;
-    }
 
-    // Consume adjacent plant
-    consumePlant(x, y) {
-        for (let ny = Math.max(0, y - 1); ny <= Math.min(this.height - 1, y + 1); ny++) {
-            for (let nx = Math.max(0, x - 1); nx <= Math.min(this.width - 1, x + 1); nx++) {
-                if (nx === x && ny === y) continue;
+        // Roots absorb water and grow downward
+        else if (plantState === 4) { // Root
+            // Absorb water from surrounding soil
+            const neighbors = [];
+            for (let ny = y; ny <= Math.min(this.height-1, y+2); ny++) {
+                for (let nx = Math.max(0, x-1); nx <= Math.min(this.width-1, x+1); nx++) {
+                    if (nx === x && ny === y) continue;
+                    neighbors.push({x: nx, y: ny});
+                }
+            }
 
-                const checkIdx = this.posToIndex(nx, ny);
-                if (this.typeArray[checkIdx] === 3 && Math.random() < 0.2) {
-                    // Convert plant back to soil with extra nutrients
-                    this.typeArray[checkIdx] = 1;
-                    this.stateArray[checkIdx] = 0;
-                    this.nutrientArray[checkIdx] += 15;
+            for (const {x: nx, y: ny} of neighbors) {
+                const neighborIdx = this.posToIndex(nx, ny);
 
-                    // Mark change
+                if (this.typeArray[neighborIdx] === 1 && this.waterArray[neighborIdx] > 10) { // Soil with water
+                    // Absorb water
+                    const absorbAmount = Math.min(5, this.waterArray[neighborIdx]);
+                    this.waterArray[neighborIdx] -= absorbAmount;
+                    this.waterArray[idx] += absorbAmount;
+
                     this.markChange(nx, ny);
-                    return;
+                    break;
                 }
+            }
+
+            // Grow downward or sideways
+            if (this.energyArray[idx] > 60 && Math.random() < 0.03) {
+                const directions = [[0, 1], [-1, 1], [1, 1], [-1, 0], [1, 0]]; // Prefer downward
+                this.shuffleArray(directions);
+
+                for (const [dx, dy] of directions) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+
+                    if (nx >= 0 && nx < this.width && ny >= 0 && ny < this.height) {
+                        const neighborIdx = this.posToIndex(nx, ny);
+
+                        if (this.typeArray[neighborIdx] === 1) { // Soil
+                            // Create root in soil
+                            this.typeArray[neighborIdx] = 3; // Plant
+                            this.stateArray[neighborIdx] = 4; // Root
+
+                            this.energyArray[neighborIdx] = this.energyArray[idx] * 0.7;
+                            this.energyArray[idx] *= 0.7;
+                            this.waterArray[neighborIdx] = this.waterArray[idx] * 0.7;
+                            this.waterArray[idx] *= 0.7;
+
+                            this.markChange(nx, ny);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Flowers can produce seeds
+        else if (plantState === 7) { // Flower
+            if (this.energyArray[idx] > 100 && Math.random() < 0.02) {
+                // Find air pixels for seed placement
+                const directions = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+                this.shuffleArray(directions);
+
+                for (const [dx, dy] of directions) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+
+                    if (nx >= 0 && nx < this.width && ny >= 0 && ny < this.height) {
+                        const neighborIdx = this.posToIndex(nx, ny);
+
+                        if (this.typeArray[neighborIdx] === 0) { // air
+                            // Create seed
+                            this.typeArray[neighborIdx] = 5; // Seed
+                            this.energyArray[neighborIdx] = 100;
+                            this.energyArray[idx] -= 50;
+
+                            this.markChange(nx, ny);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Plants consume energy and water over time
+        this.energyArray[idx] -= 0.2;
+
+        // If energy depleted, plant dies
+        if (this.energyArray[idx] <= 0) {
+            this.typeArray[idx] = 6; // Dead matter
+            this.markChange(x, y);
+        }
+    }
+
+    // Process insect movement and behavior
+    processInsect(x, y, idx) {
+        // Consume energy over time
+        this.energyArray[idx] -= 1;
+
+        // If no energy, die
+        if (this.energyArray[idx] <= 0) {
+            this.typeArray[idx] = 6; // Dead matter
+            this.markChange(x, y);
+            return;
+        }
+
+        // Check for plants to eat
+        const neighbors = [];
+        for (let ny = Math.max(0, y-1); ny <= Math.min(this.height-1, y+1); ny++) {
+            for (let nx = Math.max(0, x-1); nx <= Math.min(this.width-1, x+1); nx++) {
+                if (nx === x && ny === y) continue;
+                neighbors.push({x: nx, y: ny});
+            }
+        }
+
+        // Shuffle neighbors for more random behavior
+        this.shuffleArray(neighbors);
+
+        // Try to eat plants
+        for (const {x: nx, y: ny} of neighbors) {
+            const neighborIdx = this.posToIndex(nx, ny);
+
+            if (this.typeArray[neighborIdx] === 3) { // Plant
+                // Eat plant and gain energy
+                this.energyArray[idx] += 30;
+                this.typeArray[neighborIdx] = 6; // Convert to dead matter
+                this.markChange(nx, ny);
+                break;
+            }
+        }
+
+        // Move randomly
+        if (Math.random() < 0.3) {
+            // Get available directions
+            const availableDirections = [];
+
+            for (const {x: nx, y: ny} of neighbors) {
+                const neighborIdx = this.posToIndex(nx, ny);
+
+                if (this.typeArray[neighborIdx] === 0) { // air
+                    availableDirections.push({x: nx, y: ny, idx: neighborIdx});
+                }
+            }
+
+            // If there are available directions, move
+            if (availableDirections.length > 0) {
+                const destination = availableDirections[Math.floor(Math.random() * availableDirections.length)];
+
+                // Move insect
+                this.typeArray[destination.idx] = 4; // Insect
+                this.energyArray[destination.idx] = this.energyArray[idx];
+
+                this.typeArray[idx] = 0; // Air
+                this.energyArray[idx] = 0;
+
+                this.markChange(x, y);
+                this.markChange(destination.x, destination.y);
             }
         }
     }
 
-    // Main simulation update function
+    // Update method called each frame
     update() {
         // Reset change tracking array
         this.changeArray.fill(0);
@@ -596,35 +734,20 @@ class ChunkedEcosystem {
 
     // Process global environmental effects
     processGlobalEffects() {
-        // Day/night cycle logic
-        // Light levels would affect plant growth and evaporation
+        // Simplified day/night cycle
 
-        // Rain simulation
-        if (Math.random() < 0.01) { // 1% chance of rain each tick
-            this.simulateRain();
-        }
-    }
+        // Rain simulation - add water to random top pixels
+        if (Math.random() < 0.005) { // 0.5% chance of rain each tick
+            for (let x = 0; x < this.width; x++) {
+                if (Math.random() < 0.05) { // 5% of top pixels get rain
+                    const idx = this.posToIndex(x, 0);
 
-    // Simulate rainfall
-    simulateRain() {
-        // Determine intensity and duration of rain
-        const intensity = Math.random() * 0.2; // 0-20% of top pixels get rain
-
-        // Add water to random top pixels
-        for (let x = 0; x < this.width; x++) {
-            if (Math.random() < intensity) {
-                const idx = this.posToIndex(x, 0);
-
-                // Create water or add to existing water
-                if (this.typeArray[idx] === 0) {
-                    this.typeArray[idx] = 2; // Water
-                    this.waterArray[idx] = 200 + Math.floor(Math.random() * 55); // Random water amount
-                } else if (this.typeArray[idx] === 2) {
-                    this.waterArray[idx] = Math.min(255, this.waterArray[idx] + 50);
+                    if (this.typeArray[idx] === 0) { // Air
+                        this.typeArray[idx] = 2; // Water
+                        this.waterArray[idx] = 200; // Random water amount
+                        this.markChange(x, 0);
+                    }
                 }
-
-                // Mark change
-                this.markChange(x, 0);
             }
         }
     }
@@ -653,64 +776,13 @@ class ChunkedEcosystem {
         }
     }
 
-    // Initialize ecosystem with basic elements
-    initializeEcosystem() {
-        // Add ground layer
-        const groundLevel = Math.floor(this.height * 0.7);
-
-        for (let y = groundLevel; y < this.height; y++) {
-            for (let x = 0; x < this.width; x++) {
-                const idx = this.posToIndex(x, y);
-
-                // Create soil
-                this.typeArray[idx] = 1; // Soil
-
-                // Initial nutrients and water
-                this.nutrientArray[idx] = 50 + Math.floor(Math.random() * 50);
-                this.waterArray[idx] = 20 + Math.floor(Math.random() * 30);
-
-                // Mark as active to start
-                this.markChange(x, y);
-            }
+    // Helper function to shuffle an array
+    shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
         }
-
-        // Add initial plants
-        const plantCount = Math.floor(this.width * 0.1); // 10% of width gets plants
-
-        for (let i = 0; i < plantCount; i++) {
-            const x = Math.floor(Math.random() * this.width);
-            const y = groundLevel - 1;
-            const idx = this.posToIndex(x, y);
-
-            // Create stem pixel
-            this.typeArray[idx] = 3; // Plant
-            this.stateArray[idx] = 1; // Stem
-
-            // Create root pixel
-            const rootIdx = this.posToIndex(x, groundLevel);
-            this.typeArray[rootIdx] = 3; // Plant
-            this.stateArray[rootIdx] = 2; // Root
-
-            // Mark changes
-            this.markChange(x, y);
-            this.markChange(x, groundLevel);
-        }
-
-        // Add initial insects
-        const insectCount = Math.floor(this.width * 0.02); // 2% of width gets insects
-
-        for (let i = 0; i < insectCount; i++) {
-            const x = Math.floor(Math.random() * this.width);
-            const y = groundLevel - 2;
-            const idx = this.posToIndex(x, y);
-
-            // Create insect
-            this.typeArray[idx] = 4; // Insect
-            this.energyArray[idx] = 150; // Initial energy
-
-            // Mark change
-            this.markChange(x, y);
-        }
+        return array;
     }
 
     // Get color for rendering pixel
@@ -733,16 +805,30 @@ class ChunkedEcosystem {
                 return `rgb(10, 100, ${waterLevel})`;
 
             case 3: // Plant
-                if (state === 1) { // Stem/Leaf
+                if (state === 6) { // Leaf
                     const health = 100 + Math.floor(this.energyArray[idx] / 5);
                     return `rgb(10, ${health}, 50)`;
-                } else { // Root
+                } else if (state === 5) { // Stem
+                    return 'rgb(50, 120, 30)';
+                } else if (state === 4) { // Root
                     return 'rgb(120, 80, 40)';
+                } else if (state === 7) { // Flower
+                    return 'rgb(255, 200, 50)';
                 }
+                return 'rgb(20, 100, 40)';
 
             case 4: // Insect
                 const energy = Math.floor(50 + (this.energyArray[idx] / 255) * 150);
                 return `rgb(${energy}, ${energy}, 20)`;
+
+            case 5: // Seed
+                return 'rgb(120, 100, 60)';
+
+            case 6: // Dead matter
+                return 'rgb(100, 90, 70)';
+
+            case 7: // Worm
+                return 'rgb(180, 130, 130)';
 
             default:
                 return 'rgb(0, 0, 0)'; // Black for unknown
@@ -755,72 +841,11 @@ class ChunkedEcosystem {
         ctx.clearRect(0, 0, this.width, this.height);
 
         // Option 1: Render full simulation (slower)
-        /*
         for (let y = 0; y < this.height; y++) {
-          for (let x = 0; x < this.width; x++) {
-            ctx.fillStyle = this.getPixelColor(x, y);
-            ctx.fillRect(x, y, 1, 1);
-          }
-        }
-        */
-
-        // Option 2: Render only active chunks (much faster)
-        for (const chunkIdx of this.activeChunks) {
-            const cy = Math.floor(chunkIdx / this.chunksX);
-            const cx = chunkIdx % this.chunksX;
-
-            const startX = cx * this.chunkSize;
-            const startY = cy * this.chunkSize;
-            const endX = Math.min(startX + this.chunkSize, this.width);
-            const endY = Math.min(startY + this.chunkSize, this.height);
-
-            // Create ImageData for chunk
-            const imgData = ctx.createImageData(endX - startX, endY - startY);
-            const data = imgData.data;
-
-            // Fill pixel data
-            for (let y = startY; y < endY; y++) {
-                for (let x = startX; x < endX; x++) {
-                    const idx = this.posToIndex(x, y);
-                    const pixelType = this.typeArray[idx];
-
-                    // Calculate position in ImageData array
-                    const imgIdx = ((y - startY) * (endX - startX) + (x - startX)) * 4;
-
-                    // Set color based on pixel type
-                    const color = this.getPixelColor(x, y);
-                    const matches = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-
-                    if (matches) {
-                        data[imgIdx] = parseInt(matches[1]);     // R
-                        data[imgIdx + 1] = parseInt(matches[2]); // G
-                        data[imgIdx + 2] = parseInt(matches[3]); // B
-                        data[imgIdx + 3] = 255;                  // A (fully opaque)
-                    }
-                }
+            for (let x = 0; x < this.width; x++) {
+                ctx.fillStyle = this.getPixelColor(x, y);
+                ctx.fillRect(x, y, 1, 1);
             }
-
-            // Draw the ImageData
-            ctx.putImageData(imgData, startX, startY);
         }
-
-        // Option 3: For debugging, draw chunk boundaries
-        /*
-        ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
-        for (let cy = 0; cy < this.chunksY; cy++) {
-          for (let cx = 0; cx < this.chunksX; cx++) {
-            const chunkIdx = cy * this.chunksX + cx;
-
-            if (this.activeChunks.has(chunkIdx)) {
-              ctx.strokeRect(
-                cx * this.chunkSize,
-                cy * this.chunkSize,
-                this.chunkSize,
-                this.chunkSize
-              );
-            }
-          }
-        }
-        */
     }
 }

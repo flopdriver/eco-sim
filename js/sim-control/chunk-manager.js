@@ -78,10 +78,10 @@ const ChunkManager = {
         switch (originalType) {
             case this.controller.TYPE.AIR:
                 return 0; // Air/Empty
-            case this.controller.TYPE.SOIL:
-                return 1; // Soil
             case this.controller.TYPE.WATER:
                 return 2; // Water
+            case this.controller.TYPE.SOIL:
+                return 1; // Soil
             case this.controller.TYPE.PLANT:
                 return 3; // Plant
             case this.controller.TYPE.INSECT:
@@ -178,8 +178,9 @@ const ChunkManager = {
                 for (let x = startX; x < endX; x++) {
                     const index = core.getIndex(x, y);
 
-                    if (index !== -1 && ecosystem.changeArray[index]) {
-                        // Copy state back to core simulation
+                    if (index !== -1) {
+                        // Always sync pixels in active chunks, not just those with changes marked
+                        // This ensures all simulation state gets properly synchronized
                         core.type[index] = this.translateTypeBack(ecosystem.typeArray[index]);
                         core.state[index] = ecosystem.stateArray[index];
                         core.water[index] = ecosystem.waterArray[index];
