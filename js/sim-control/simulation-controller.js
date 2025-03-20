@@ -19,15 +19,15 @@ const SimulationController = {
     running: false,
     simulationSpeed: 1,
 
-    // Active pixel tracking
+    // Active pixel tracking (mainly for rendering now)
     activePixels: null,
 
     // Type and state enums
     TYPE: null,
     STATE: null,
 
+    // Chunk system
     chunkManager: null,
-    useChunkedProcessing: true, // Flag to enable/disable chunked processing
 
     init: function(canvasId) {
         console.log("Initializing simulation controller...");
@@ -38,7 +38,7 @@ const SimulationController = {
             return null;
         }
 
-        // Initialize active pixels set
+        // Initialize active pixels set (still needed for rendering)
         this.activePixels = new Set();
 
         // Initialize all module managers
@@ -68,10 +68,8 @@ const SimulationController = {
         // Initialize environmental-biological connections
         this.ecosystemBalancer.initializeEnvironmentalConnections();
 
-        // Initialize chunk manager if chunked processing is enabled
-        if (this.useChunkedProcessing) {
-            this.chunkManager = ChunkManager.init(this);
-        }
+        // Initialize chunk manager - always use chunked processing
+        this.chunkManager = ChunkManager.init(this);
 
         console.log("Simulation initialization complete.");
         return this;
@@ -113,10 +111,8 @@ const SimulationController = {
         this.running = true;
         this.performanceManager.resetTiming();
 
-        // Initialize chunked system if needed
-        if (this.useChunkedProcessing && this.chunkManager) {
-            this.chunkManager.initialSync();
-        }
+        // Initialize chunked system and sync data
+        this.chunkManager.initialSync();
 
         requestAnimationFrame(() => this.update());
     },
@@ -160,6 +156,9 @@ const SimulationController = {
         // Reset environmental-biological connections
         this.ecosystemBalancer.initializeEnvironmentalConnections();
 
+        // Re-initialize chunk system
+        this.chunkManager.initialSync();
+
         // Restart simulation
         this.start();
     },
@@ -170,34 +169,15 @@ const SimulationController = {
         // Track performance
         this.performanceManager.startFrame();
 
-        // Process active pixels
-        if (this.useChunkedProcessing && this.chunkManager) {
-            // Use chunked processing
-            this.chunkManager.update();
-        } else {
-            // Use original processing
-            // Track pixels that will become active next frame
-            const nextActivePixels = new Set();
-
-            // Run multiple update steps based on speed setting
-            for (let i = 0; i < this.simulationSpeed; i++) {
-                // Periodically update environmental-biological connections
-                if (i === 0 && Math.random() < 0.05) {
-                    this.ecosystemBalancer.updateBiologicalRates();
-                }
-
-                // Update each system in order:
-                this.environment.update(this.activePixels, nextActivePixels);
-                this.physics.update(this.activePixels, nextActivePixels);
-                this.biology.update(this.activePixels, nextActivePixels);
-
-                // Manage active pixels with performance considerations
-                this.performanceManager.manageActivePixels(nextActivePixels);
-
-                // Update active pixels for next iteration
-                this.activePixels = new Set(nextActivePixels);
-                nextActivePixels.clear();
+        // Run multiple update steps based on speed setting
+        for (let i = 0; i < this.simulationSpeed; i++) {
+            // Periodically update environmental-biological connections
+            if (i === 0 && Math.random() < 0.05) {
+                this.ecosystemBalancer.updateBiologicalRates();
             }
+
+            // Update using chunk manager (optimized approach)
+            this.chunkManager.update();
         }
 
         // End timing for this frame

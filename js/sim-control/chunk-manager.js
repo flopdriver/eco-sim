@@ -13,6 +13,10 @@ const ChunkManager = {
     chunksX: 0,
     chunksY: 0,
 
+    // Enums for type translation
+    TYPE: null,
+    STATE: null,
+
     // Debugging
     debugMode: false,
 
@@ -31,9 +35,23 @@ const ChunkManager = {
         this.chunksX = Math.ceil(width / this.chunkSize);
         this.chunksY = Math.ceil(height / this.chunkSize);
 
+        // Store references to TYPE and STATE enums
+        this.TYPE = this.controller.TYPE;
+        this.STATE = this.controller.STATE;
+
         console.log(`Created chunked ecosystem with ${this.chunksX}x${this.chunksY} chunks`);
 
         return this;
+    },
+
+    // Set TYPE enum reference
+    setTypeEnum: function(TYPE) {
+        this.TYPE = TYPE;
+    },
+
+    // Set STATE enum reference
+    setStateEnum: function(STATE) {
+        this.STATE = STATE;
     },
 
     // Sync full state from original simulation to chunked system
@@ -62,7 +80,7 @@ const ChunkManager = {
                     ecosystem.metadataArray[index] = core.metadata[index];
 
                     // Mark as active (if not air)
-                    if (core.type[index] !== this.controller.TYPE.AIR) {
+                    if (core.type[index] !== this.TYPE.AIR) {
                         ecosystem.markChange(x, y);
                     }
                 }
@@ -76,21 +94,21 @@ const ChunkManager = {
     translateType: function(originalType) {
         // Map from simulation TYPE enum to chunked system types
         switch (originalType) {
-            case this.controller.TYPE.AIR:
+            case this.TYPE.AIR:
                 return 0; // Air/Empty
-            case this.controller.TYPE.WATER:
+            case this.TYPE.WATER:
                 return 2; // Water
-            case this.controller.TYPE.SOIL:
+            case this.TYPE.SOIL:
                 return 1; // Soil
-            case this.controller.TYPE.PLANT:
+            case this.TYPE.PLANT:
                 return 3; // Plant
-            case this.controller.TYPE.INSECT:
+            case this.TYPE.INSECT:
                 return 4; // Insect
-            case this.controller.TYPE.SEED:
+            case this.TYPE.SEED:
                 return 5; // Seed
-            case this.controller.TYPE.DEAD_MATTER:
+            case this.TYPE.DEAD_MATTER:
                 return 6; // Dead matter
-            case this.controller.TYPE.WORM:
+            case this.TYPE.WORM:
                 return 7; // Worm
             default:
                 return 0; // Default to air
@@ -102,62 +120,50 @@ const ChunkManager = {
         // Map from chunked system types to simulation TYPE enum
         switch (chunkedType) {
             case 0:
-                return this.controller.TYPE.AIR;
+                return this.TYPE.AIR;
             case 1:
-                return this.controller.TYPE.SOIL;
+                return this.TYPE.SOIL;
             case 2:
-                return this.controller.TYPE.WATER;
+                return this.TYPE.WATER;
             case 3:
-                return this.controller.TYPE.PLANT;
+                return this.TYPE.PLANT;
             case 4:
-                return this.controller.TYPE.INSECT;
+                return this.TYPE.INSECT;
             case 5:
-                return this.controller.TYPE.SEED;
+                return this.TYPE.SEED;
             case 6:
-                return this.controller.TYPE.DEAD_MATTER;
+                return this.TYPE.DEAD_MATTER;
             case 7:
-                return this.controller.TYPE.WORM;
+                return this.TYPE.WORM;
             default:
-                return this.controller.TYPE.AIR;
+                return this.TYPE.AIR;
         }
     },
 
     // Update the active pixels set based on chunked ecosystem's active chunks
+    // Only needed for rendering compatibility
     updateActivePixels: function() {
         // Clear the controller's active pixels set
         this.controller.activePixels.clear();
 
-        // Add all pixels in active chunks to the set
+        // Add all pixels in active chunks to the set (more efficient approach)
         const ecosystem = this.chunkedEcosystem;
 
-        for (const chunkIdx of ecosystem.activeChunks) {
-            const cy = Math.floor(chunkIdx / ecosystem.chunksX);
-            const cx = chunkIdx % ecosystem.chunksX;
-
-            // Get chunk boundaries
-            const startX = cx * ecosystem.chunkSize;
-            const startY = cy * ecosystem.chunkSize;
-            const endX = Math.min(startX + ecosystem.chunkSize, ecosystem.width);
-            const endY = Math.min(startY + ecosystem.chunkSize, ecosystem.height);
-
-            // Add all pixels in chunk to active set
-            for (let y = startY; y < endY; y++) {
-                for (let x = startX; x < endX; x++) {
-                    const index = this.controller.core.getIndex(x, y);
-                    if (index !== -1) {
-                        this.controller.activePixels.add(index);
-                    }
-                }
+        // Only add non-air pixels to active set
+        for (let i = 0; i < ecosystem.typeArray.length; i++) {
+            if (ecosystem.typeArray[i] !== 0) { // Not air
+                this.controller.activePixels.add(i);
             }
         }
 
         // For debugging, log the number of active pixels
-        if (this.debugMode) {
+        if (this.debugMode && this.controller.activePixels.size % 100 === 0) {
             console.log(`Active pixels: ${this.controller.activePixels.size}`);
         }
     },
 
     // Sync changes from chunked system back to original simulation
+    // Only needed for rendering compatibility
     syncChangesToCore: function() {
         const ecosystem = this.chunkedEcosystem;
         const core = this.controller.core;
@@ -179,8 +185,7 @@ const ChunkManager = {
                     const index = core.getIndex(x, y);
 
                     if (index !== -1) {
-                        // Always sync pixels in active chunks, not just those with changes marked
-                        // This ensures all simulation state gets properly synchronized
+                        // Always sync pixels in active chunks
                         core.type[index] = this.translateTypeBack(ecosystem.typeArray[index]);
                         core.state[index] = ecosystem.stateArray[index];
                         core.water[index] = ecosystem.waterArray[index];
@@ -198,10 +203,10 @@ const ChunkManager = {
         // Update the chunked system
         this.chunkedEcosystem.update();
 
-        // Sync changes back to the core simulation
+        // Sync changes back to the core simulation for rendering compatibility
         this.syncChangesToCore();
 
-        // Update the active pixels set for other systems
+        // Update the active pixels set for rendering
         this.updateActivePixels();
     },
 
