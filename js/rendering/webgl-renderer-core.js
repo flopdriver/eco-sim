@@ -1,5 +1,4 @@
-// WebGL Renderer Core Module
-// Manages the main WebGL context and rendering pipeline
+// webgl-renderer-core.js - Updated version
 
 window.WebGLRendererCore = {
     // Canvas and GL context
@@ -43,11 +42,12 @@ window.WebGLRendererCore = {
             return null;
         }
 
-        // Set canvas size to match the simulation size
+        // Set canvas size to match the simulation size precisely
+        // This ensures exact 1:1 mapping of simulation pixels to render pixels
         this.canvas.width = core.width * core.pixelSize;
         this.canvas.height = core.height * core.pixelSize;
 
-        // Store base dimensions for reference (this is the simulation size, not the canvas size)
+        // Store base dimensions for reference
         this.baseWidth = core.width;
         this.baseHeight = core.height;
 
@@ -76,6 +76,9 @@ window.WebGLRendererCore = {
 
         // Initialize texture data array (RGBA for each pixel)
         this.textureData = new Uint8Array(core.width * core.height * 4);
+
+        // Set viewport to match canvas size exactly
+        this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 
         return this;
     },
@@ -112,9 +115,11 @@ window.WebGLRendererCore = {
         this.texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, this.texture);
 
-        // Set texture parameters
+        // Set texture parameters - critically important for pixel-perfect rendering
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        // NEAREST filtering is crucial for pixel-perfect rendering
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 
@@ -207,12 +212,6 @@ window.WebGLRendererCore = {
         const width = this.core.width;
         const height = this.core.height;
 
-        // Calculate the visible portion of the texture based on canvas aspect ratio
-        const canvasAspect = this.canvas.width / this.canvas.height;
-        const textureAspect = width / height;
-
-        let visibleWidth, visibleHeight;
-
         // Default behavior - cover the entire texture
         if (this.zoomLevel === 1.0 && this.panX === 0 && this.panY === 0) {
             // Use simple coordinates that map the entire texture
@@ -226,21 +225,24 @@ window.WebGLRendererCore = {
             return;
         }
 
-        // Calculate visible dimensions based on zoom
-        visibleWidth = width / this.zoomLevel;
-        visibleHeight = height / this.zoomLevel;
+        // Calculate visible dimensions based on zoom (improved precision for zoom)
+        const visibleWidth = width / this.zoomLevel;
+        const visibleHeight = height / this.zoomLevel;
 
-        // Calculate normalized texture coordinates
-        let left = this.panX / width;
-        let right = Math.min(1.0, (this.panX + visibleWidth) / width);
-        let bottom = 1.0 - Math.min(1.0, (this.panY + visibleHeight) / height); // Flipped Y
-        let top = 1.0 - (this.panY / height); // Flipped Y
+        // Calculate normalized texture coordinates with improved precision
+        // Clamp pan values to prevent showing outside the texture
+        const maxPanX = Math.max(0, width - (width / this.zoomLevel));
+        const maxPanY = Math.max(0, height - (height / this.zoomLevel));
 
-        // Safety checks to avoid out of bounds texture coordinates
-        left = Math.max(0.0, Math.min(1.0, left));
-        right = Math.max(0.0, Math.min(1.0, right));
-        bottom = Math.max(0.0, Math.min(1.0, bottom));
-        top = Math.max(0.0, Math.min(1.0, top));
+        // Clamp pan values to valid range
+        const clampedPanX = Math.max(0, Math.min(maxPanX, this.panX));
+        const clampedPanY = Math.max(0, Math.min(maxPanY, this.panY));
+
+        // Calculate texture coordinates with high precision
+        let left = clampedPanX / width;
+        let right = Math.min(1.0, (clampedPanX + visibleWidth) / width);
+        let bottom = 1.0 - Math.min(1.0, (clampedPanY + visibleHeight) / height); // Flipped Y
+        let top = 1.0 - (clampedPanY / height); // Flipped Y
 
         // Update the texture coordinate buffer
         gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer);
@@ -252,9 +254,9 @@ window.WebGLRendererCore = {
         ]), gl.STATIC_DRAW);
     },
 
-    // Set zoom level and pan offset
+    // Set zoom level and pan offset with improved precision
     setZoom: function(zoomLevel, panX, panY) {
-        this.zoomLevel = zoomLevel;
+        this.zoomLevel = Math.max(0.1, zoomLevel); // Prevent zoom from going too small
         this.panX = panX || 0;
         this.panY = panY || 0;
 
@@ -262,11 +264,19 @@ window.WebGLRendererCore = {
         this.render();
     },
 
-    // Resize the WebGL canvas and viewport
+    // Resize the WebGL canvas and viewport with pixel-perfect scaling
     resize: function(width, height) {
-        this.canvas.width = width;
-        this.canvas.height = height;
-        this.gl.viewport(0, 0, width, height);
+        // Calculate the scaling factor to maintain pixel-perfect rendering
+        const pixelRatio = window.devicePixelRatio || 1;
+        const displayWidth = Math.floor(width * pixelRatio);
+        const displayHeight = Math.floor(height * pixelRatio);
+
+        // Set canvas dimensions
+        this.canvas.width = displayWidth;
+        this.canvas.height = displayHeight;
+
+        // Update viewport to match the new canvas size
+        this.gl.viewport(0, 0, displayWidth, displayHeight);
 
         // Force a re-render with new size
         this.render();
@@ -281,7 +291,6 @@ window.WebGLRendererCore = {
         }
 
         // Adjust the canvas style size for proper display scaling
-        // This keeps the canvas looking full-sized while maintaining aspect ratio
         const containerWidth = window.innerWidth;
         const containerHeight = window.innerHeight;
 
@@ -300,8 +309,9 @@ window.WebGLRendererCore = {
             styleHeight = styleWidth / simulationAspect;
         }
 
-        this.canvas.style.width = `${styleWidth}px`;
-        this.canvas.style.height = `${styleHeight}px`;
+        // Apply CSS styles for dimensions - use integers for pixel-perfect rendering
+        this.canvas.style.width = `${Math.floor(styleWidth)}px`;
+        this.canvas.style.height = `${Math.floor(styleHeight)}px`;
 
         console.log(`WebGL scale factor set to: ${scaleFactor}, Canvas style size: ${styleWidth}x${styleHeight}`);
     }
