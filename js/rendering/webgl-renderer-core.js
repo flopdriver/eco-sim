@@ -192,27 +192,17 @@ window.WebGLRendererCore = {
             this.baseHeight = this.core.height;
         }
         
-        // Simply adjust the canvas size for now
-        // The pixel scaling is handled by CSS/HTML
+        // Adjust the canvas style size for proper display scaling
         this.canvas.style.width = `${this.baseWidth * scaleFactor}px`;
         this.canvas.style.height = `${this.baseHeight * scaleFactor}px`;
         
-        console.log(`WebGL scale factor set to: ${scaleFactor}`);
-    },
-    
-    // Set scale factor for maintaining simulation size while scaling display
-    setScaleFactor: function(scaleFactor) {
-        // Store the base width and height if not already stored
-        if (!this.baseWidth) {
-            this.baseWidth = this.core.width;
-            this.baseHeight = this.core.height;
-        }
-        
-        // Update shader uniforms for scaling
-        gl.useProgram(this.program);
-        const scaleLocation = gl.getUniformLocation(this.program, "u_scale");
-        if (scaleLocation) {
-            gl.uniform1f(scaleLocation, scaleFactor);
+        // Update shader uniforms for scaling if available
+        if (this.gl && this.program) {
+            this.gl.useProgram(this.program);
+            const scaleLocation = this.gl.getUniformLocation(this.program, "u_scale");
+            if (scaleLocation) {
+                this.gl.uniform1f(scaleLocation, scaleFactor);
+            }
         }
         
         console.log(`WebGL scale factor set to: ${scaleFactor}`);

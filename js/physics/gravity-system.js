@@ -29,7 +29,7 @@ const GravitySystem = {
                 type === this.physics.TYPE.SEED ||
                 type === this.physics.TYPE.DEAD_MATTER ||
                 type === this.physics.TYPE.WORM ||
-                (type === this.physics.TYPE.INSECT && (this.physics.core.metadata[index] > 15 || Math.random() < 0.3)) // Insects fall more often
+                (type === this.physics.TYPE.INSECT && (this.physics.core.metadata[index] > 8 || Math.random() < 0.6)) // Increased insect falling chance
             );
 
             if (affectedByGravity) {
@@ -67,9 +67,9 @@ const GravitySystem = {
         // Adjust probability based on stuck counter
         let diagonalProbability = 0.3 * this.gravityStrength;
         
-        // Increase probability based on stuck counter
-        if (stuckCounter > 5) {
-            diagonalProbability = Math.min(0.9, diagonalProbability + (stuckCounter * 0.03));
+        // Increase probability based on stuck counter - more aggressive unsticking
+        if (stuckCounter > 3) {
+            diagonalProbability = Math.min(0.95, diagonalProbability + (stuckCounter * 0.05));
         }
         
         if (Math.random() < diagonalProbability) {
@@ -105,7 +105,7 @@ const GravitySystem = {
         }
         
         // If the object is severely stuck, try more aggressive measures
-        if (stuckCounter > 30) {
+        if (stuckCounter > 15) {
             // Force movement in any available direction
             const neighbors = this.physics.core.getNeighborIndices(x, y);
             

@@ -25,6 +25,74 @@ const PlantSystem = {
         waterNeeds: 1.0,            // Water needs multiplier based on plant size
         totalSize: 0                // Total size of the plant (pixel count)
     },
+    
+    // Plant species/variants
+    plantSpecies: [
+        {
+            name: "jungle_vine",
+            leafShape: "heart",
+            leafSize: 1.2,
+            stemColor: "green", // bright green stems
+            leafColor: "vibrant", // bright green leaves
+            growthRate: 1.3
+        },
+        {
+            name: "tropical_palm",
+            leafShape: "fan",
+            leafSize: 1.5,
+            stemColor: "brown", // brown stems
+            leafColor: "deep", // deep green leaves
+            growthRate: 0.9
+        },
+        {
+            name: "fern",
+            leafShape: "frond",
+            leafSize: 0.9,
+            stemColor: "darkgreen", // dark green stems
+            leafColor: "forest", // forest green leaves 
+            growthRate: 1.1
+        },
+        {
+            name: "succulent",
+            leafShape: "round",
+            leafSize: 0.8,
+            stemColor: "reddish", // reddish stems
+            leafColor: "pale", // pale green leaves with blue tint
+            growthRate: 0.7
+        },
+        {
+            name: "bamboo",
+            leafShape: "pointed",
+            leafSize: 0.7,
+            stemColor: "yellow", // yellowish stems
+            leafColor: "light", // light green leaves
+            growthRate: 1.2
+        },
+        {
+            name: "flower_bush",
+            leafShape: "oval",
+            leafSize: 0.9,
+            stemColor: "purple", // purplish stems
+            leafColor: "dark", // dark green leaves
+            growthRate: 1.0
+        }
+    ],
+    
+    // Plant age tracking by plant part indices
+    plantAges: {},                  // Map of indices to age (frames since creation)
+    
+    // Plant origin tracking - where each plant germinated
+    plantOrigins: {},              // Map of plant group IDs to origin coordinates {x, y}
+    
+    // Track the exact x-position of the first stem for each plant
+    stemOrigins: {},               // Map of plant group IDs to stem x-coordinates
+    
+    // Plant groups to track which plant parts belong to which original plant
+    plantGroups: {},               // Map of indices to plant group IDs
+    nextPlantGroupId: 1,           // Counter for assigning unique IDs to plant groups
+    
+    // Store species/variant information for each plant group
+    plantSpeciesMap: {},           // Map of plant group IDs to species indices
 
     // Initialize plant system
     init: function(biologySystem) {
@@ -40,6 +108,15 @@ const PlantSystem = {
         this.stemSystem = PlantStemSystem.init(this);
         this.leafSystem = PlantLeafSystem.init(this);
         this.flowerSystem = PlantFlowerSystem.init(this);
+        
+        // Initialize plant ages tracking
+        this.plantAges = {};
+        
+        // Initialize plant origin tracking
+        this.plantOrigins = {};
+        this.stemOrigins = {};
+        this.plantGroups = {};
+        this.nextPlantGroupId = 1;
 
         return this;
     },
@@ -69,6 +146,11 @@ const PlantSystem = {
             this.plantConnectivity.checkedThisFrame = new Uint8Array(this.core.size);
         }
         
+        // Make sure metadata array exists (used for trunk tracking)
+        if (!this.core.metadata) {
+            this.core.metadata = new Uint8Array(this.core.size);
+        }
+        
         // Reset connectivity arrays
         this.plantConnectivity.connectedToGround.fill(0);
         this.plantConnectivity.checkedThisFrame.fill(0);
@@ -83,6 +165,9 @@ const PlantSystem = {
         // Third pass - count metrics (stem height, leaf count) only for connected plants
         this.countPlantMetrics(activePixels);
         
+        // Process any trapped debris inside plants
+        this.processTrappedDebris(activePixels, nextActivePixels);
+        
         // Fourth pass - update each plant pixel or detach floating parts
         activePixels.forEach(index => {
             if (this.core.type[index] === this.TYPE.PLANT && !this.biology.processedThisFrame[index]) {
@@ -90,6 +175,13 @@ const PlantSystem = {
                 
                 // Check if this plant part is connected to the ground
                 if (this.plantConnectivity.connectedToGround[index]) {
+                    // Track or update plant age
+                    if (!this.plantAges[index]) {
+                        this.plantAges[index] = 1; // Initialize age if not already tracked
+                    } else {
+                        this.plantAges[index]++; // Increment age counter
+                    }
+                    
                     // Connected plant parts update normally
                     this.updateSinglePlant(coords.x, coords.y, index, nextActivePixels);
                 } else {
@@ -190,6 +282,100 @@ const PlantSystem = {
                         this.plantConnectivity.connectedToGround[index] = 1;
                         this.plantConnectivity.rootIndices.push(index);
                     }
+                }
+            }
+        });
+    },
+    
+    // Process debris that might be trapped inside a plant
+    processTrappedDebris: function(activePixels, nextActivePixels) {
+        activePixels.forEach(index => {
+            if (this.core.type[index] === this.TYPE.DEAD_MATTER && !this.biology.processedThisFrame[index]) {
+                const coords = this.core.getCoords(index);
+                
+                // Check if this debris is surrounded by plant matter
+                const neighbors = this.core.getNeighborIndices(coords.x, coords.y);
+                let surroundingPlantCount = 0;
+                
+                for (const neighbor of neighbors) {
+                    if (this.core.type[neighbor.index] === this.TYPE.PLANT) {
+                        surroundingPlantCount++;
+                    }
+                }
+                
+                // If debris is mostly surrounded by plant matter (3+ sides), process it
+                if (surroundingPlantCount >= 3) {
+                    // Mark as processed
+                    this.biology.processedThisFrame[index] = 1;
+                    
+                    // 25% chance to begin decomposing in place
+                    if (Math.random() < 0.25) {
+                        // Accelerated decomposition for trapped debris
+                        if (!this.core.metadata[index]) {
+                            this.core.metadata[index] = 20; // Start with some decomposition progress
+                        } else {
+                            this.core.metadata[index] += 5; // Progress decomposition faster
+                        }
+                        
+                        // If fully decomposed, convert to nutrients for the plant
+                        if (this.core.metadata[index] >= 100) {
+                            // Find a nearby plant part to give nutrients to
+                            let targetNeighbor = null;
+                            for (const neighbor of neighbors) {
+                                if (this.core.type[neighbor.index] === this.TYPE.PLANT) {
+                                    targetNeighbor = neighbor;
+                                    break;
+                                }
+                            }
+                            
+                            if (targetNeighbor) {
+                                // Transfer nutrients to plant part
+                                this.core.energy[targetNeighbor.index] = Math.min(255, 
+                                    this.core.energy[targetNeighbor.index] + 20);
+                                
+                                // Increase water if needed
+                                if (this.core.water[targetNeighbor.index] < 100) {
+                                    this.core.water[targetNeighbor.index] += 10;
+                                }
+                                
+                                // Remove debris
+                                this.core.type[index] = this.TYPE.AIR;
+                                nextActivePixels.add(targetNeighbor.index);
+                            } else {
+                                // If no plant neighbors found, just convert to air
+                                this.core.type[index] = this.TYPE.AIR;
+                            }
+                        } else {
+                            // Still decomposing, remain active
+                            nextActivePixels.add(index);
+                        }
+                    } 
+                    // 25% chance to be pushed out of the plant gradually
+                    else if (Math.random() < 0.33) {
+                        // Find nearby air pixel to move toward
+                        let airNeighbors = [];
+                        for (const neighbor of neighbors) {
+                            if (this.core.type[neighbor.index] === this.TYPE.AIR) {
+                                airNeighbors.push(neighbor);
+                            }
+                        }
+                        
+                        // If an air pixel is found, move toward it
+                        if (airNeighbors.length > 0) {
+                            const targetAir = airNeighbors[Math.floor(Math.random() * airNeighbors.length)];
+                            this.core.swapPixels(index, targetAir.index);
+                            nextActivePixels.add(targetAir.index);
+                        } else {
+                            // No air found, stay active
+                            nextActivePixels.add(index);
+                        }
+                    } else {
+                        // Otherwise, remain active but don't change yet
+                        nextActivePixels.add(index);
+                    }
+                } else {
+                    // Not surrounded enough by plant to count as trapped
+                    nextActivePixels.add(index);
                 }
             }
         });
@@ -388,6 +574,9 @@ const PlantSystem = {
                 this.core.nutrient[index] = 15;
                 break;
         }
+        
+        // Clean up age tracking when plant part is detached
+        delete this.plantAges[index];
         
         // Reset state to default
         this.core.state[index] = this.STATE.DEFAULT;

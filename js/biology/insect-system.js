@@ -40,9 +40,19 @@ const InsectSystem = {
         // Insects move, eat plants, and reproduce
         // They also need energy to survive
 
-        // Introduce a starvation counter
+        // Initialize metadata if not present
         if (!this.core.metadata[index]) {
-            this.core.metadata[index] = 0; // Initialize starvation counter
+            this.core.metadata[index] = {
+                starvationCounter: 0,
+                onPlant: false
+            };
+        } else if (typeof this.core.metadata[index] === 'number') {
+            // Convert old number format to object format
+            const oldCounter = this.core.metadata[index];
+            this.core.metadata[index] = {
+                starvationCounter: oldCounter,
+                onPlant: false
+            };
         }
 
         // Significant energy consumption each tick
@@ -50,15 +60,30 @@ const InsectSystem = {
 
         // If couldn't eat in previous ticks, increase starvation counter
         if (this.core.energy[index] < 150) {
-            this.core.metadata[index]++; // Increment starvation counter
+            this.core.metadata[index].starvationCounter++; // Increment starvation counter
         } else {
             // Reset starvation counter if well-fed
-            this.core.metadata[index] = 0;
+            this.core.metadata[index].starvationCounter = 0;
         }
 
         // Die quickly if not eating
-        if (this.core.metadata[index] > 1) {
-            this.core.type[index] = this.TYPE.DEAD_MATTER;
+        if (this.core.metadata[index].starvationCounter > 1) {
+            // If insect was on a plant, restore the plant when it dies
+            if (this.core.metadata[index].onPlant) {
+                this.core.type[index] = this.TYPE.PLANT;
+                this.core.state[index] = this.core.metadata[index].plantState;
+                this.core.energy[index] = this.core.metadata[index].plantEnergy;
+                if (this.core.metadata[index].plantWater) {
+                    this.core.water[index] = this.core.metadata[index].plantWater;
+                }
+            } else {
+                // Convert to dead matter with some initial decomposition progress
+                this.core.type[index] = this.TYPE.DEAD_MATTER;
+                // Initialize decomposition between 5-15% to represent that insects decompose faster
+                this.core.metadata[index] = Math.floor(5 + Math.random() * 10);
+                this.core.energy[index] = Math.max(10, this.core.energy[index] / 2);
+                this.core.nutrient[index] = 15 + Math.floor(Math.random() * 10);
+            }
             nextActivePixels.add(index);
             return;
         }
@@ -76,7 +101,7 @@ const InsectSystem = {
             this.moveInsect(x, y, index, nextActivePixels, true);
         } else {
             // Enough energy, consider reproduction
-            if (this.core.energy[index] > 200 && Math.random() < 0.02 * this.biology.reproduction) {
+            if (this.core.energy[index] > 200 && Math.random() < 0.002 * this.biology.reproduction) {
                 this.reproduceInsect(x, y, index, nextActivePixels);
             } else {
                 // Otherwise just move randomly
@@ -136,12 +161,13 @@ const InsectSystem = {
     moveInsect: function(x, y, index, nextActivePixels, seekingFood) {
         let possibleMoves = [];
 
-        // Get all possible moves (into air or water)
+        // Get all possible moves (into air, water, or plants)
         const neighbors = this.core.getNeighborIndices(x, y);
 
         for (const neighbor of neighbors) {
-            // Can move into air and occasionally into water (if desperate)
+            // Can move into air, plants (flying over), and occasionally into water (if desperate)
             if (this.core.type[neighbor.index] === this.TYPE.AIR || 
+                this.core.type[neighbor.index] === this.TYPE.PLANT ||
                 (this.core.type[neighbor.index] === this.TYPE.WATER && 
                  (this.core.energy[index] < 50 || Math.random() < 0.2))) {
                 possibleMoves.push(neighbor);
@@ -176,15 +202,59 @@ const InsectSystem = {
         if (possibleMoves.length > 0) {
             const move = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
 
+            // Store the destination plant information if moving into a plant
+            const isMovingIntoPlant = this.core.type[move.index] === this.TYPE.PLANT;
+            const plantState = isMovingIntoPlant ? this.core.state[move.index] : null;
+            const plantEnergy = isMovingIntoPlant ? this.core.energy[move.index] : 0;
+            const plantWater = isMovingIntoPlant ? this.core.water[move.index] : 0;
+            
+            // Check if insect is currently on a plant and needs to restore it when moving
+            const wasOnPlant = this.core.metadata[index] && 
+                              this.core.metadata[index].onPlant;
+            
             // Move insect
             this.core.type[move.index] = this.TYPE.INSECT;
             this.core.state[move.index] = this.core.state[index];
             this.core.energy[move.index] = this.core.energy[index];
 
-            // Clear original position
-            this.core.type[index] = this.TYPE.AIR;
-            this.core.state[index] = this.STATE.DEFAULT;
-            this.core.energy[index] = 0;
+            // Clear original position or restore plant
+            if (wasOnPlant) {
+                // Restore the plant
+                this.core.type[index] = this.TYPE.PLANT;
+                this.core.state[index] = this.core.metadata[index].plantState;
+                this.core.energy[index] = this.core.metadata[index].plantEnergy;
+                if (this.core.metadata[index].plantWater) {
+                    this.core.water[index] = this.core.metadata[index].plantWater;
+                }
+            } else {
+                // No plant to restore
+                this.core.type[index] = this.TYPE.AIR;
+                this.core.state[index] = this.STATE.DEFAULT;
+                this.core.energy[index] = 0;
+            }
+            
+            // Transfer metadata to new position
+            if (!this.core.metadata[move.index]) {
+                this.core.metadata[move.index] = {};
+            }
+            
+            // If insect has starvation counter, keep it
+            if (this.core.metadata[index] && this.core.metadata[index].starvationCounter !== undefined) {
+                this.core.metadata[move.index].starvationCounter = this.core.metadata[index].starvationCounter;
+            } else {
+                this.core.metadata[move.index].starvationCounter = 0;
+            }
+            
+            // Store plant info in the insect's metadata if moving into a plant
+            if (isMovingIntoPlant) {
+                this.core.metadata[move.index].onPlant = true;
+                this.core.metadata[move.index].plantState = plantState;
+                this.core.metadata[move.index].plantEnergy = plantEnergy;
+                this.core.metadata[move.index].plantWater = plantWater;
+            } else {
+                // Clear plant status if moving to air or water
+                this.core.metadata[move.index].onPlant = false;
+            }
 
             // Mark new position as processed
             this.biology.processedThisFrame[move.index] = 1;

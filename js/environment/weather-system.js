@@ -10,7 +10,9 @@ const WeatherSystem = {
         cloudiness: 0,         // 0-1 range representing cloud coverage
         cloudPixels: [],       // Actual cloud pixels
         maxCloudWidth: 0,      // Maximum width of clouds
-        cloudColor: null,      // Cloud color
+        cloudColor: null,      // Base cloud color
+        upperLayerColor: null, // Upper layer cloud color
+        lowerLayerColor: null, // Lower layer cloud color
         movementSpeed: 0.3,    // Cloud movement speed
         cloudDensity: 0.9      // Cloud density factor
     },
@@ -64,12 +66,28 @@ const WeatherSystem = {
     // Create initial cloud formation
     createInitialClouds: function() {
         const core = this.environment.core;
-        const cloudColor = {
+        
+        // Base cloud color
+        const baseCloudColor = {
             r: 240,
             g: 240,
             b: 250
         };
-        this.cloudProperties.cloudColor = cloudColor;
+        this.cloudProperties.cloudColor = baseCloudColor;
+        
+        // Upper layer clouds - slightly brighter, whiter
+        this.cloudProperties.upperLayerColor = {
+            r: 250,
+            g: 250,
+            b: 255
+        };
+        
+        // Lower layer clouds - slightly darker, hint of gray
+        this.cloudProperties.lowerLayerColor = {
+            r: 220,
+            g: 225,
+            b: 240
+        };
 
         // Clear previous cloud pixels
         this.cloudProperties.cloudPixels = [];
@@ -81,13 +99,27 @@ const WeatherSystem = {
 
         // Create varied clouds based on cloudiness
         const cloudiness = this.weatherPatterns.patterns[this.weatherPatterns.current].cloudiness;
-        const numClouds = Math.floor(2 + cloudiness * 4); // 2-6 clouds based on cloudiness
+        const numClouds = Math.floor(3 + cloudiness * 5); // 3-8 clouds based on cloudiness
         
+        // Create clouds in two layers for a more dynamic sky
         for (let cloud = 0; cloud < numClouds; cloud++) {
             const cloudStartX = Math.floor(Math.random() * core.width);
             const cloudWidth = Math.floor(this.cloudProperties.maxCloudWidth * (0.3 + cloudiness * 0.4));
-            const cloudHeight = Math.floor(core.height * 0.08 * (0.8 + cloudiness));
-            const cloudY = Math.floor(core.height * 0.15 + Math.random() * Math.floor(core.height * 0.1));
+            const cloudHeight = Math.floor(core.height * 0.06 * (0.8 + cloudiness));
+            
+            // Determine which cloud layer this cloud belongs to
+            let cloudY;
+            let cloudLayerType; // Track which layer for coloring
+            
+            if (cloud % 2 === 0) {
+                // Upper layer (5-10% from top)
+                cloudY = Math.floor(core.height * 0.05 + Math.random() * Math.floor(core.height * 0.05));
+                cloudLayerType = 'upper';
+            } else {
+                // Lower layer (12-18% from top)
+                cloudY = Math.floor(core.height * 0.12 + Math.random() * Math.floor(core.height * 0.06));
+                cloudLayerType = 'lower';
+            }
             
             // Define the cloud center
             const cloudCenterX = cloudStartX + Math.floor(cloudWidth / 2);
@@ -110,11 +142,12 @@ const WeatherSystem = {
                     if (Math.random() < this.cloudProperties.cloudDensity * centerFactor) {
                         const cloudDensity = Math.min(1, 0.7 + centerFactor * 0.3);
                         
-                        // Add to cloud pixels array
+                        // Add to cloud pixels array with layer information for color
                         this.cloudProperties.cloudPixels.push({ 
                             x: wrappedX, 
                             y: y,
-                            density: cloudDensity
+                            density: cloudDensity,
+                            layer: cloudLayerType // Store which layer this cloud pixel belongs to
                         });
                         
                         // Set in core simulation grid
@@ -184,8 +217,10 @@ const WeatherSystem = {
         // Update rain properties based on current weather pattern
         const pattern = this.weatherPatterns.patterns[this.weatherPatterns.current];
         this.rainProperties.intensity = pattern.rainProbability;
+        
+        // Increased droplet generation for two cloud layers
         this.rainProperties.maxDropletsPerTick = Math.floor(
-            this.environment.core.width * 0.15 * pattern.rainProbability // Massively increased from 0.06 to 0.15 for Jumanji-like rainfall
+            this.environment.core.width * 0.2 * pattern.rainProbability // Further increased for double cloud layer system
         );
 
         if (pattern.rainProbability > 0) {
@@ -254,7 +289,7 @@ const WeatherSystem = {
                         const newX = (existingCloud.x + (Math.random() * 6) - 3 + core.width) % core.width;
                         const newY = existingCloud.y + (Math.random() * 4) - 2;
                         
-                        if (newY >= 0 && newY < core.height * 0.35) {
+                        if (newY >= 0 && newY < core.height * 0.2) {
                             const newCloud = { 
                                 x: newX, 
                                 y: newY,

@@ -55,6 +55,28 @@ const SeedSystem = {
                     // Initial root has more water and energy
                     this.core.water[index] = 80; // Increased from 50
                     this.core.energy[index] = Math.max(this.core.energy[index], 150); // Adding initial energy
+                    
+                    // Record the origin of this plant for trunk positioning
+                    const plantGroupId = this.biology.plantSystem.nextPlantGroupId++;
+                    this.biology.plantSystem.plantGroups[index] = plantGroupId;
+                    this.biology.plantSystem.plantOrigins[plantGroupId] = {x: x, y: y};
+                    
+                    // Assign a random plant species - each plant is unique
+                    let speciesIndex;
+                    
+                    // Check if this seed came from a flower with specific traits (inherit from parent)
+                    if (this.core.metadata[index] > 0) {
+                        // Extract the flower type from metadata (high 4 bits)
+                        const flowerType = (this.core.metadata[index] >> 4) & 0xF;
+                        // Match flower type to corresponding plant species
+                        speciesIndex = flowerType % this.biology.plantSystem.plantSpecies.length;
+                    } else {
+                        // Otherwise completely random choice
+                        speciesIndex = Math.floor(Math.random() * this.biology.plantSystem.plantSpecies.length);
+                    }
+                    
+                    // Store species information for this plant group
+                    this.biology.plantSystem.plantSpeciesMap[plantGroupId] = speciesIndex;
 
                     nextActivePixels.add(index);
                     return;
@@ -89,6 +111,28 @@ const SeedSystem = {
 
                     // Roots from buried seeds start with extra energy
                     this.core.energy[index] = Math.max(this.core.energy[index], 200); // Increased energy
+                    
+                    // Record the origin of this plant for trunk positioning
+                    const plantGroupId = this.biology.plantSystem.nextPlantGroupId++;
+                    this.biology.plantSystem.plantGroups[index] = plantGroupId;
+                    this.biology.plantSystem.plantOrigins[plantGroupId] = {x: x, y: y};
+                    
+                    // Assign a random plant species for unique plants
+                    let speciesIndex;
+                    
+                    // Check if this seed came from a flower with specific traits
+                    if (this.core.metadata[index] > 0) {
+                        // Extract the flower type from metadata (high 4 bits)
+                        const flowerType = (this.core.metadata[index] >> 4) & 0xF;
+                        // Match flower type to corresponding plant species
+                        speciesIndex = flowerType % this.biology.plantSystem.plantSpecies.length;
+                    } else {
+                        // Otherwise completely random species
+                        speciesIndex = Math.floor(Math.random() * this.biology.plantSystem.plantSpecies.length);
+                    }
+                    
+                    // Store species information for this plant group
+                    this.biology.plantSystem.plantSpeciesMap[plantGroupId] = speciesIndex;
 
                     nextActivePixels.add(index);
                     return;

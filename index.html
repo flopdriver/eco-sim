@@ -262,18 +262,26 @@
             const canvas = document.getElementById('ecosystem-canvas');
             const container = document.querySelector('.canvas-container');
             if (canvas && container) {
+                // Set the canvas size to match the window
                 canvas.width = window.innerWidth;
                 canvas.height = window.innerHeight;
                 container.style.width = window.innerWidth + 'px';
                 container.style.height = window.innerHeight + 'px';
                 
                 try {
-                    // If we have access to the renderer, update scale factor instead of pixel count
-                    if (window.WebGLRenderingSystem && window.WebGLRenderingSystem.rendererCore) {
-                        // Update the canvas size first
+                    // If we have access to the renderer, update properly
+                    if (window.WebGLRenderingSystem) {
+                        // Update the WebGL viewport first
                         WebGLRenderingSystem.resize(window.innerWidth, window.innerHeight);
+                        
                         // Then update scale factor for the simulation
+                        // This ensures mouse coordinates map correctly
                         WebGLRenderingSystem.updateScaleFactor(window.innerWidth, window.innerHeight);
+                        
+                        // Force a render update
+                        if (window.ecosim && window.ecosim.rendering) {
+                            window.ecosim.rendering.render();
+                        }
                     }
                 } catch (e) {
                     console.warn("Could not resize canvas properly:", e);

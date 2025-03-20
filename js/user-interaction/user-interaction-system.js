@@ -56,17 +56,34 @@ window.UserInteractionSystem = {
 
     // Convert canvas/client coordinates to simulation coordinates
     getSimCoordinates: function(event) {
+        // Get the canvas bounding rectangle
         const rect = this.canvas.getBoundingClientRect();
+        
+        // Calculate scaling factor between physical size and logical size
         const scaleX = this.canvas.width / rect.width;
         const scaleY = this.canvas.height / rect.height;
-
+        
+        // Calculate exact position inside canvas element
         const canvasX = (event.clientX - rect.left) * scaleX;
         const canvasY = (event.clientY - rect.top) * scaleY;
-
-        const simX = Math.floor(canvasX / this.core.pixelSize);
-        // Y coordinates remain the same since we fixed the rendering in WebGL
-        const simY = Math.floor(canvasY / this.core.pixelSize);
-
+        
+        // Now calculate the simulation position by getting proportional position
+        // Use the render scale factor if available to account for canvas resizing
+        let simX, simY;
+        
+        // Use core width/height for simulation dimensions, divided by pixelSize
+        simX = Math.floor(canvasX / this.core.pixelSize);
+        simY = Math.floor(canvasY / this.core.pixelSize);
+        
+        // Check scale factors from WebGL renderer if available 
+        if (window.WebGLRenderingSystem && window.WebGLRenderingSystem.rendererCore && 
+            window.WebGLRenderingSystem.rendererCore.baseWidth) {
+            
+            // Log pixel positions for debugging
+            console.log(`Mouse at (${event.clientX}, ${event.clientY}), SimPos: (${simX}, ${simY})`);
+        }
+        
+        // Ensure coordinates are within simulation bounds
         return {
             x: Math.max(0, Math.min(this.core.width - 1, simX)),
             y: Math.max(0, Math.min(this.core.height - 1, simY))

@@ -48,8 +48,23 @@ const DecompositionSystem = {
             this.core.metadata[index] = 0;
         }
 
-        // First, check if there's soil or water below (for gravity)
+        // Apply gravity to dead matter - it should gradually settle to the ground
         const downIndex = this.core.getIndex(x, y + 1);
+        if (downIndex !== -1 && this.core.type[downIndex] === this.TYPE.AIR && Math.random() < 0.3) {
+            // Move dead matter downward if there's air below
+            this.core.type[downIndex] = this.TYPE.DEAD_MATTER;
+            this.core.type[index] = this.TYPE.AIR;
+            
+            // Transfer properties
+            this.core.metadata[downIndex] = this.core.metadata[index];
+            this.core.energy[downIndex] = this.core.energy[index];
+            this.core.nutrient[downIndex] = this.core.nutrient[index] || 0;
+            
+            // Mark new position as active and processed
+            nextActivePixels.add(downIndex);
+            this.biology.processedThisFrame[downIndex] = 1;
+            return;
+        }
 
         // Environmental factors that affect decomposition
         let decompositionRate = 1.0; // Base rate
@@ -90,20 +105,37 @@ const DecompositionSystem = {
 
         // Check if decomposition is complete
         if (this.core.metadata[index] >= 100) {
-            // Fully decomposed - convert to appropriate type
-            if (downIndex !== -1 && this.core.type[downIndex] === this.TYPE.SOIL) {
-                // If above soil, add nutrients to soil below
-                this.core.nutrient[downIndex] += 20 + Math.floor(Math.random() * 10);
-                this.core.state[downIndex] = this.STATE.FERTILE;
-                this.core.type[index] = this.TYPE.AIR;
-                nextActivePixels.add(downIndex);
-            } else if (downIndex !== -1 && this.core.type[downIndex] === this.TYPE.WATER) {
-                // If above water, add nutrients to water below
-                this.core.nutrient[downIndex] += 10 + Math.floor(Math.random() * 5);
-                this.core.type[index] = this.TYPE.AIR;
-                nextActivePixels.add(downIndex);
+            // Fully decomposed - convert to appropriate type based on position
+            if (downIndex !== -1) {
+                if (this.core.type[downIndex] === this.TYPE.SOIL) {
+                    // If above soil, add nutrients to soil below
+                    this.core.nutrient[downIndex] += 20 + Math.floor(Math.random() * 10);
+                    this.core.state[downIndex] = this.STATE.FERTILE;
+                    this.core.type[index] = this.TYPE.AIR;
+                    nextActivePixels.add(downIndex);
+                } else if (this.core.type[downIndex] === this.TYPE.WATER) {
+                    // If above water, add nutrients to water below
+                    this.core.nutrient[downIndex] += 10 + Math.floor(Math.random() * 5);
+                    this.core.type[index] = this.TYPE.AIR;
+                    nextActivePixels.add(downIndex);
+                } else if (this.core.type[downIndex] === this.TYPE.AIR) {
+                    // If above air and not on ground level, try to fall down
+                    // This simulates dead matter gradually sinking to the ground
+                    this.core.type[index] = this.TYPE.AIR;
+                    this.core.type[downIndex] = this.TYPE.DEAD_MATTER;
+                    this.core.metadata[downIndex] = this.core.metadata[index];
+                    this.core.nutrient[downIndex] = this.core.nutrient[index];
+                    this.core.energy[downIndex] = this.core.energy[index];
+                    nextActivePixels.add(downIndex);
+                } else {
+                    // Convert to fertile soil in place
+                    this.core.type[index] = this.TYPE.SOIL;
+                    this.core.state[index] = this.STATE.FERTILE;
+                    this.core.nutrient[index] = 25 + Math.floor(Math.random() * 10);
+                    nextActivePixels.add(index);
+                }
             } else {
-                // Convert to fertile soil in place
+                // Convert to fertile soil in place if at bottom or no pixel below
                 this.core.type[index] = this.TYPE.SOIL;
                 this.core.state[index] = this.STATE.FERTILE;
                 this.core.nutrient[index] = 25 + Math.floor(Math.random() * 10);
