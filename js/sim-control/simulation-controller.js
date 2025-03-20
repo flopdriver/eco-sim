@@ -105,6 +105,87 @@ const SimulationController = {
         };
     },
 
+    initializeSystems: function(canvasId) {
+        console.log("Initializing subsystems...");
+
+        // 1. Core data structures (still needed for rendering/reference)
+        this.core = CoreSimulation.init();
+        if (!this.core) {
+            console.error("Failed to initialize core simulation.");
+            return false;
+        }
+
+        // Set TYPE and STATE on core immediately
+        this.core.TYPE = this.controller.TYPE;
+        this.core.STATE = this.controller.STATE;
+
+        // 2. Initialize chunk manager first, as it's needed for rendering
+        this.chunkManager = ChunkManager.init(this);
+        if (!this.chunkManager) {
+            console.error("Failed to initialize chunk manager.");
+            return false;
+        }
+
+        // 3. Environment system (depends on core)
+        this.environment = EnvironmentController.init(this.core);
+        if (!this.environment) {
+            console.error("Failed to initialize environment system.");
+            return false;
+        }
+
+        // Set TYPE and STATE on environment immediately
+        this.environment.TYPE = this.TYPE;
+        this.environment.STATE = this.STATE;
+
+        // 4. Physics system (depends on core)
+        this.physics = PhysicsSystem.init(this.core);
+        if (!this.physics) {
+            console.error("Failed to initialize physics system.");
+            return false;
+        }
+
+        // Set TYPE and STATE on physics immediately
+        this.physics.TYPE = this.TYPE;
+        this.physics.STATE = this.STATE;
+
+        // 5. Biology system (depends on core and environment)
+        this.biology = BiologySystem.init(this.core);
+        if (!this.biology) {
+            console.error("Failed to initialize biology system.");
+            return false;
+        }
+
+        // Set TYPE and STATE on biology immediately
+        this.biology.TYPE = this.TYPE;
+        this.biology.STATE = this.STATE;
+        this.biology.propagateConstants();
+
+        // 6. Rendering system (depends on core and now on chunk manager too)
+        this.rendering = WebGLRenderingSystem.init(this.core, canvasId, this.chunkManager);
+        if (!this.rendering) {
+            console.error("Failed to initialize WebGL rendering system.");
+            return false;
+        }
+
+        // 7. User interaction system (depends on core and rendering)
+        this.userInteraction = UserInteractionSystem.init(
+            this.core,
+            this.rendering.canvas
+        );
+        if (!this.userInteraction) {
+            console.error("Failed to initialize user interaction system.");
+            return false;
+        }
+
+        // Set TYPE and STATE on user interaction immediately
+        this.userInteraction.TYPE = this.TYPE;
+        this.userInteraction.STATE = this.STATE;
+        this.userInteraction.propagateConstants();
+
+        console.log("All subsystems initialized successfully");
+        return true;
+    },
+
     // Start the simulation
     start: function() {
         console.log("Starting simulation...");
@@ -186,7 +267,7 @@ const SimulationController = {
         // Update statistics display
         this.uiManager.updateStats();
 
-        // Render
+        // Render - no need to sync active pixels since rendering is now chunk-based
         this.rendering.render();
 
         // Schedule next update
