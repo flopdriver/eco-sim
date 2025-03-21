@@ -16,7 +16,7 @@ window.ColorMapper = {
         this.weatherSystem = null; // Will be set by environment controller
         return this;
     },
-    
+
     // Set reference to weather system
     setWeatherSystem: function(weatherSystem) {
         this.weatherSystem = weatherSystem;
@@ -31,14 +31,14 @@ window.ColorMapper = {
                 upper: { r: 250, g: 250, b: 255 }, // Brighter, whiter for upper layer
                 lower: { r: 220, g: 225, b: 240 }  // Slightly darker, hint of blue for lower layer
             };
-            
+
             // Default cloud color if we can't determine the layer
             let cloudColor = {
                 r: 240,
                 g: 240,
                 b: 250
             };
-            
+
             // Try to determine which cloud layer this pixel belongs to
             if (this.weatherSystem && this.weatherSystem.cloudProperties.cloudPixels) {
                 const coords = this.core.getCoords(index);
@@ -55,7 +55,7 @@ window.ColorMapper = {
                     }
                 }
             }
-            
+
             // Add slight variation to avoid uniform appearance
             return {
                 r: cloudColor.r + Math.floor(Math.random() * 5) - 2,
@@ -63,7 +63,7 @@ window.ColorMapper = {
                 b: cloudColor.b + Math.floor(Math.random() * 5) - 2
             };
         }
-        
+
         // Handle specialized visualization modes
         if (VisualizationManager.getMode() !== 'normal') {
             return this.getSpecializedVisualizationColor(index);
@@ -75,6 +75,8 @@ window.ColorMapper = {
         const water = this.core.water[index];
         const energy = this.core.energy[index];
         const nutrient = this.core.nutrient[index];
+
+
 
         // Default colors
         let r = 0, g = 0, b = 0;
@@ -146,14 +148,14 @@ window.ColorMapper = {
                         // Get age info for darkening
                         const rootAge = PlantSystem.plantAges[index] || 1;
                         const rootAgeFactor = Math.min(0.5, rootAge / 500); // Max 50% darkening at age 500
-                        
+
                         // Roots - BRIGHTENED COLORS for better visibility against soil
                         // Cap the water influence to prevent blue tinting with high water levels
                         const cappedWater = Math.min(100, water); // Cap water value at 100 for color calculation
                         r = 160 - Math.floor(cappedWater * 0.15) + Math.floor(Math.random() * 10) - 5; // Reduced water influence
                         g = 120 + Math.floor(cappedWater * 0.05) + Math.floor(Math.random() * 10) - 5; // Reduced water influence
                         b = 65 + Math.floor(Math.random() * 8) - 4; // Fixed base value, reduced from 80
-                        
+
                         // Darken based on age
                         r = Math.floor(r * (1 - rootAgeFactor));
                         g = Math.floor(g * (1 - rootAgeFactor));
@@ -163,11 +165,11 @@ window.ColorMapper = {
                         // Get age info for darkening
                         const stemAge = PlantSystem.plantAges[index] || 1;
                         const stemAgeFactor = Math.min(0.45, stemAge / 600); // Max 45% darkening at age 600
-                        
+
                         // Check for metadata about plant species
                         // For stems we'll use metadata to check for trunk/species type
                         const metadata = this.core.metadata[index];
-                        
+
                         // Get plant group ID to check for species
                         let speciesIndex = -1;
                         let plantGroupId = null;
@@ -177,20 +179,20 @@ window.ColorMapper = {
                                 speciesIndex = PlantSystem.plantSpeciesMap[plantGroupId];
                             }
                         }
-                        
+
                         // Check if this is a trunk part as marked in metadata
                         // We now have different trunk thickness values (50-70) instead of just 100
                         const trunkValue = metadata >= 50 && metadata < 80 ? metadata : 0;
                         const isTrunk = trunkValue >= 50;
                         const trunkThickness = isTrunk ? (trunkValue - 50) / 20 : 0; // 0-1 scale for thickness
-                        
+
                         if (isTrunk) {
                             // Trunk - BROWN STEM color with varying thickness
                             // Skinnier trunks are slightly more reddish-brown
                             r = 130 + Math.floor(Math.random() * 15) - 5 - Math.floor(trunkThickness * 20); // Thicker = less red
                             g = 85 + Math.floor(Math.random() * 10) - 5 - Math.floor(trunkThickness * 15);  // Thicker = less green
                             b = 45 + Math.floor(Math.random() * 8) - 4 - Math.floor(trunkThickness * 10);   // Thicker = less blue
-                            
+
                             // Adjust trunk color based on species if available
                             if (speciesIndex >= 0 && PlantSystem.plantSpecies) {
                                 const species = PlantSystem.plantSpecies[speciesIndex];
@@ -222,13 +224,13 @@ window.ColorMapper = {
                                     }
                                 }
                             }
-                            
+
                             // Add some subtle variation for bendiness
                             if (Math.random() < 0.3) {
                                 r += Math.floor(Math.random() * 10);
                                 g += Math.floor(Math.random() * 8);
                             }
-                            
+
                             // Darken based on age to simulate hardening wood
                             const trunkAgeFactor = Math.min(0.3, stemAge / 800); // Slower darkening
                             r = Math.floor(r * (1 - trunkAgeFactor * 0.5));
@@ -239,13 +241,13 @@ window.ColorMapper = {
                             let baseRed = 65;
                             let baseGreen = 160;
                             let baseBlue = 65;
-                            
+
                             // Apply species-specific stem color if available
                             if (speciesIndex >= 0 && PlantSystem.plantSpecies) {
                                 const species = PlantSystem.plantSpecies[speciesIndex];
                                 if (species) {
                                     switch (species.stemColor) {
-                                        case "green": // Bright green stems 
+                                        case "green": // Bright green stems
                                             baseRed = 60;
                                             baseGreen = 180;
                                             baseBlue = 70;
@@ -278,12 +280,12 @@ window.ColorMapper = {
                                     }
                                 }
                             }
-                            
+
                             // Apply energy and randomization
                             r = baseRed + Math.floor(energy * 0.05) + Math.floor(Math.random() * 10) - 5;
                             g = baseGreen + Math.floor(energy * 0.1) + Math.floor(Math.random() * 15) - 7;
                             b = baseBlue + Math.floor(Math.random() * 10) - 5;
-                            
+
                             // Darken based on age - stems get more brown as they age
                             r = Math.floor(r * (1 - stemAgeFactor * 0.6)); // Less darkening for red (becoming more brown)
                             g = Math.floor(g * (1 - stemAgeFactor));
@@ -294,18 +296,18 @@ window.ColorMapper = {
                         // Get age info for darkening/yellowing
                         const leafAge = PlantSystem.plantAges[index] || 1;
                         const leafAgeFactor = Math.min(0.7, leafAge / 400); // Max 70% effect at age 400
-                        
+
                         // Get leaf metadata to determine color variation if available
                         const leafMetadata = this.core.metadata[index] || 0;
                         // Extract shape type (high 4 bits) and color variation (low 4 bits)
                         const leafShape = (leafMetadata >> 4) & 0xF; // 0-5 shape types
                         const leafColorVar = leafMetadata & 0xF; // 0-4 color variations
-                        
+
                         // Leaf color based on plant species and color variation
                         let baseRed = 30;
                         let baseGreen = 170;
                         let baseBlue = 40;
-                        
+
                         // Adjust base color based on leaf type/species
                         switch (leafColorVar) {
                             case 0: // Vibrant green (jungle_vine)
@@ -334,7 +336,7 @@ window.ColorMapper = {
                                 baseBlue = 50;
                                 break;
                         }
-                        
+
                         // Leaf shape also influences color - adjust for uniqueness
                         if (leafShape === 0) { // Heart shape (slightly redder)
                             baseRed += 15;
@@ -351,7 +353,7 @@ window.ColorMapper = {
                         } else if (leafShape === 5) { // Oval shape (balanced)
                             // No adjustment
                         }
-                        
+
                         // Use both energy and water to influence color
                         const energyFactor = Math.min(1.0, energy / 200);
                         const waterFactor = Math.min(1.0, water / 200);
@@ -373,28 +375,28 @@ window.ColorMapper = {
                         // Get age info for flower
                         const flowerAge = PlantSystem.plantAges[index] || 1;
                         const flowerAgeFactor = Math.min(0.8, flowerAge / 300); // Max 80% effect at age 300
-                        
+
                         // Enhanced flower visualization with distinct petal and center colors
                         // Get metadata to determine flower type and color variation
                         const flowerMetadata = this.core.metadata[index] || 0;
                         // Extract flower type (high 4 bits) and color variation (low 4 bits)
                         const flowerType = (flowerMetadata >> 4) & 0xF; // 0-5 flower types
                         const colorVar = flowerMetadata & 0xF; // 0-4 color variations
-                        
+
                         // Get coordinates for additional variation
                         const coords = this.core.getCoords(index);
-                        
+
                         // Check if it's a flower center (has stem connections) or petal
                         let isCenter = false;
                         const neighbors = this.core.getNeighborIndices(coords.x, coords.y);
                         for (const neighbor of neighbors) {
-                            if (this.core.type[neighbor.index] === this.TYPE.PLANT && 
+                            if (this.core.type[neighbor.index] === this.TYPE.PLANT &&
                                 this.core.state[neighbor.index] === this.STATE.STEM) {
                                 isCenter = true;
                                 break;
                             }
                         }
-                        
+
                         // Define base colors for different flower types
                         const flowerColors = [
                             { name: "daisy", center: { r: 230, g: 200, b: 50 }, petal: { r: 250, g: 250, b: 250 } },
@@ -404,17 +406,17 @@ window.ColorMapper = {
                             { name: "orchid", center: { r: 140, g: 40, b: 180 }, petal: { r: 200, g: 80, b: 230 } },
                             { name: "lily", center: { r: 230, g: 180, b: 200 }, petal: { r: 250, g: 250, b: 240 } }
                         ];
-                        
+
                         // Get base colors for this flower type
                         const flowerTypeIndex = Math.min(flowerType, flowerColors.length - 1);
-                        let baseColor = isCenter ? 
+                        let baseColor = isCenter ?
                             { r: flowerColors[flowerTypeIndex].center.r, g: flowerColors[flowerTypeIndex].center.g, b: flowerColors[flowerTypeIndex].center.b } :
                             { r: flowerColors[flowerTypeIndex].petal.r, g: flowerColors[flowerTypeIndex].petal.g, b: flowerColors[flowerTypeIndex].petal.b };
-                        
+
                         // Apply color variation
                         let hueShift = 0;
                         let satShift = 0;
-                        
+
                         switch (colorVar) {
                             case 0: // Standard
                                 // No shift
@@ -473,12 +475,12 @@ window.ColorMapper = {
                                 }
                                 break;
                         }
-                        
+
                         // Apply base colors with some random variation
                         r = baseColor.r + Math.floor(Math.random() * 20) - 10;
                         g = baseColor.g + Math.floor(Math.random() * 20) - 10;
                         b = baseColor.b + Math.floor(Math.random() * 20) - 10;
-                        
+
                         // Age effect for flowers - they fade and brown over time
                         if (flowerAgeFactor > 0.2) {
                             // First stage - slight fading
@@ -489,7 +491,7 @@ window.ColorMapper = {
                                 r = Math.floor(r * (1 - fadeFactor) + avg * fadeFactor);
                                 g = Math.floor(g * (1 - fadeFactor) + avg * fadeFactor);
                                 b = Math.floor(b * (1 - fadeFactor) + avg * fadeFactor);
-                            } 
+                            }
                             // Second stage - browning
                             else {
                                 const brownFactor = (flowerAgeFactor - 0.5) * 2; // 0-0.6

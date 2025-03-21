@@ -19,13 +19,13 @@ const WeatherSystem = {
 
     // Rain properties - dramatically enhanced for Jumanji-style downpours
     rainProperties: {
-        intensity: 0,          // 0-1 range representing rain intensity
+        intensity: 1,          // 0-1 range representing rain intensity
         droplets: [],          // Array to store active rain droplets
         maxDropletsPerTick: 0, // Maximum number of droplets per tick
         dropletSizes: {        // Different droplet size configurations (massively increased for Jumanji effect)
-            small: { water: 200, speed: 20, probability: 0.3 },
-            medium: { water: 300, speed: 30, probability: 0.4 },
-            large: { water: 400, speed: 40, probability: 0.3 }  // Increased large droplet probability
+            small: { water: 200, speed: 200, probability: 0.3 },
+            medium: { water: 300, speed: 300, probability: 0.4 },
+            large: { water: 400, speed: 400, probability: 0.3 }  // Increased large droplet probability
         },
         splashEnabled: true    // Enable water splash effects
     },

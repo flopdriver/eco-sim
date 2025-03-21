@@ -7,7 +7,7 @@ const PlantRootSystem = {
 
     // Root growth patterns and parameters
     rootPatterns: {
-        primaryGrowthRate: 0.30,    // Dramatically increased for aggressive deep growth
+        primaryGrowthRate: 5.0,    // Dramatically increased for aggressive deep growth
         lateralGrowthRate: 0.30,    // Slightly reduced to encourage deeper growth
         secondaryGrowthRate: 0.25,  // Maintained for dense root networks
         tertiaryGrowthRate: 0.15,   // Maintained for intricate root systems
@@ -22,7 +22,7 @@ const PlantRootSystem = {
         ageVariation: true,         // Whether roots change behavior based on their age/depth
         growthVariability: 0.2  ,
         tendrilFrequency: 0.02,     // Chance to generate a tendril each update
-        tendrilMaxLength: 15// Random variation in growth rates for natural appearance
+        tendrilMaxLength: 150// Random variation in growth rates for natural appearance
     },
 
     // Track tendril information
@@ -168,38 +168,6 @@ const PlantRootSystem = {
         if (tracking.activeTendrils > 0 && Math.random() < 0.01) {
             tracking.activeTendrils--;
         }
-
-        // Check for and prune extremely long tendrils
-        for (const tendrilIndex in this.tendrilTracking) {
-            const tendrilTracking = this.tendrilTracking[tendrilIndex];
-
-            // Check if this is a tracked tendril originating from this root
-            if (tendrilTracking.parentIndex === index) {
-                // Get tendril coordinates
-                const tendrilCoords = this.plant.core.getCoords(parseInt(tendrilIndex));
-
-                // Check tendril length and conditions
-                if (tendrilTracking.tendrilLength >= this.rootPatterns.tendrilMaxLength ||
-                    this.plant.core.energy[parseInt(tendrilIndex)] < 10) {
-
-                    // Remove or convert the tendril
-                    this.plant.core.type[parseInt(tendrilIndex)] = this.plant.TYPE.SOIL;
-                    this.plant.core.state[parseInt(tendrilIndex)] = this.plant.STATE.DEFAULT;
-
-                    // Add nutrients from the tendril to the soil
-                    this.plant.core.nutrient[parseInt(tendrilIndex)] =
-                        Math.floor(this.plant.core.energy[parseInt(tendrilIndex)]);
-
-                    // Remove tracking
-                    delete this.tendrilTracking[tendrilIndex];
-
-                    // Reduce parent root's active tendril count
-                    if (tracking.activeTendrils > 0) {
-                        tracking.activeTendrils--;
-                    }
-                }
-            }
-        }
     },
 
     // Adjust root growth parameters based on above-ground growth
@@ -213,13 +181,13 @@ const PlantRootSystem = {
             const randomVariation = 1 + (Math.random() * this.rootPatterns.growthVariability * 2 - this.rootPatterns.growthVariability);
 
             // Calculate growth factors that change with plant maturity
-            const heightFactor = Math.min(2.0, (stemHeight / 15) + 0.5) * randomVariation;
+            const heightFactor = Math.min(200.0, (stemHeight / 15) + 0.5) * randomVariation;
             const leafFactor = Math.min(2.2, (leafCount / 8) + 0.8) * randomVariation;
 
             // Early growth - focus on primary and lateral roots
             if (stemHeight < this.rootPatterns.maturityThreshold) {
                 // Young plants focus on establishing main root structure
-                this.rootPatterns.primaryGrowthRate = 0.10 * heightFactor;
+                this.rootPatterns.primaryGrowthRate = 10.0 * heightFactor;
                 this.rootPatterns.lateralGrowthRate = 0.12 * heightFactor;
                 this.rootPatterns.secondaryGrowthRate = 0.06 * heightFactor;
                 this.rootPatterns.tertiaryGrowthRate = 0.02 * heightFactor;
@@ -240,11 +208,11 @@ const PlantRootSystem = {
             }
 
             // Root density scaling with leaf count (more leaves = more roots needed for water)
-            this.rootPatterns.rootDensityFactor = 1.2 * leafFactor;
+            this.rootPatterns.rootDensityFactor = 10.2 * leafFactor;
 
             // Adjust maximum root depth based on stem height
             // Roots grow ~4-6x the height of the stem for extremely deep roots
-            this.rootPatterns.maxRootDepth = Math.max(200, stemHeight * 6.0);
+            this.rootPatterns.maxRootDepth = Math.max(200, stemHeight * 10.0);
         }
     },
 
@@ -260,7 +228,7 @@ const PlantRootSystem = {
         const groundLevel = Math.floor(this.plant.core.height * 0.6);
         const depthFromSurface = y - groundLevel; // How far below ground
         const maxDesiredRootDepth = Math.min(this.rootPatterns.maxRootDepth,
-            Math.max(200, this.plant.plantMetrics.stemHeight * 6.0)); // Roots much deeper than stem height
+            Math.max(400, this.plant.plantMetrics.stemHeight * 6.0)); // Roots much deeper than stem height
 
         // Get plant maturity indicators
         const stemHeight = this.plant.plantMetrics.stemHeight;
@@ -285,7 +253,7 @@ const PlantRootSystem = {
 
         // Enhance downward growth for all plants, especially immature ones
         if (stemHeight < this.rootPatterns.maturityThreshold) {
-            primaryGrowthChance *= 1.5; // Increased from 1.3
+            primaryGrowthChance *= 10.5; // Increased from 1.3
         } else {
             primaryGrowthChance *= 1.2; // New bonus for mature plants
         }

@@ -7,10 +7,10 @@ const PlantStemSystem = {
 
     // Trunk development parameters
     trunkParams: {
-        initialTrunkHeight: 200
+        initialTrunkHeight: 300
         ,   // Initial trunk height before branching
         trunkThicknessVariation: 10, // Variation in trunk thickness
-        maxTrunkHeight: 300,         // Maximum height before extensive branching
+        maxTrunkHeight: 500,         // Maximum height before extensive branching
         trunkColorVariations: [
             { r: 110, g: 70, b: 40 },   // Brown
             { r: 100, g: 65, b: 35 },   // Darker brown
@@ -82,7 +82,7 @@ const PlantStemSystem = {
         const newIndex = this.plant.core.getIndex(x, newY);
 
         // Slight horizontal variation for more natural trunk growth
-        const horizontalOffset = Math.random() < 0.2 ?
+        const horizontalOffset = Math.random() < 0.1 ?
             (Math.random() < 0.5 ? -1 : 1) : 0;
         const newX = x + horizontalOffset;
         const adjustedNewIndex = this.plant.core.getIndex(newX, newY);
@@ -142,7 +142,7 @@ const PlantStemSystem = {
         const species = this.plant.plantSpecies[speciesIndex];
         
         // Adjust growth behavior based on plant species
-        let upWeight = 15;    // Default up weight
+        let upWeight = 20;    // Default up weight
         let diagWeight = 12;  // Default diagonal weight
         let sideWeight = 10;  // Default side weight
         let longWeight = 5;   // Default long reach weight
@@ -292,7 +292,7 @@ const PlantStemSystem = {
 
         // Enhanced flower production for rapid seed dispersal
         // Only at tip endpoints for better aesthetic appearance
-        if ((y < this.plant.core.height * 0.7 || Math.random() < 0.01) && this.plant.core.energy[index] > 100 && Math.random() < 0.08 * this.plant.biology.growthRate) {
+        if ((y < this.plant.core.height * 0.6 || Math.random() < 0.01) && this.plant.core.energy[index] > 100 && Math.random() < 0.08 * this.plant.biology.growthRate) {
             // Count surrounding plant parts to ensure it's a stem endpoint (max 1-2 connections)
             const neighbors = this.plant.core.getNeighborIndices(x, y);
             let stemCount = 0;
@@ -504,7 +504,7 @@ const PlantStemSystem = {
         
         // Choose leaf shape based on species
         let leafDirections = [...baseLeafDirections]; // Default shape
-        let sizeMultiplier = 1.0;
+        let sizeMultiplier = 2.0;
         
         if (species) {
             // Different species have different leaf shapes

@@ -1,7 +1,7 @@
 // Environment Controller
 // Main coordinator for all environment-related subsystems
 
-const EnvironmentController = {
+window.EnvironmentController = {
     // Reference to core simulation
     core: null,
 
