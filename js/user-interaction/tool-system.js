@@ -31,6 +31,10 @@ window.ToolSystem = {
         worm: {
             energy: 200,       // Initial worm energy
             probability: 0.1   // Chance to place worm within brush
+        },
+        fire: {
+            probability: 0.8,  // High chance to place fire within brush
+            intensity: 1.0     // Fire intensity
         }
     },
 
@@ -100,6 +104,9 @@ window.ToolSystem = {
                 break;
             case 'worm':
                 this.applyWormTool(x, y, index, intensity);
+                break;
+            case 'fire':
+                this.applyFireTool(x, y, index, intensity);
                 break;
             case 'observe':
                 this.applyObserveTool(x, y, index, intensity);
@@ -291,6 +298,24 @@ window.ToolSystem = {
                 if (window.ecosim && window.ecosim.activePixels) {
                     window.ecosim.activePixels.add(index);
                 }
+            }
+        }
+    },
+
+    // Apply fire tool
+    applyFireTool: function(x, y, index, intensity) {
+        // Skip if intensity is too low
+        if (intensity < 0.3) return;
+
+        // Only apply to plants and dead matter with some probability
+        const type = this.core.type[index];
+        if ((type === this.TYPE.PLANT || type === this.TYPE.DEAD_MATTER) &&
+            Math.random() < this.toolSettings.fire.probability * intensity) {
+
+            // Start a fire at this location
+            if (window.ecosim && window.ecosim.environment && window.ecosim.environment.fireSystem) {
+                window.ecosim.environment.fireSystem.startFire(index,
+                    window.ecosim.activePixels || new Set());
             }
         }
     },

@@ -39,6 +39,15 @@ const UIManager = {
     // Set up environment control sliders
     setupEnvironmentControls: function() {
 
+        // Fire intensity slider
+        this.setupSlider('fire-slider', 'fire-value', (value) => {
+            const percentage = value / 100;
+            if (this.controller.environment.fireSystem) {
+                this.controller.environment.fireSystem.fireProperties.spreadProbability =
+                    percentage * 0.2; // Scale to appropriate range (0 to 0.2)
+            }
+            return value + '%';
+        });
         // Lightning intensity slider
         this.setupSlider('lightning-slider', 'lightning-value', (value) => {
             const percentage = value / 100;

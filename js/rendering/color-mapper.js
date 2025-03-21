@@ -141,6 +141,7 @@ window.ColorMapper = {
             case this.TYPE.PLANT:
                 // Different plant parts have different colors - ENHANCED CONTRAST
                 switch (state) {
+
                     case this.STATE.ROOT:
                         // Get age info for darkening
                         const rootAge = PlantSystem.plantAges[index] || 1;
@@ -504,6 +505,34 @@ window.ColorMapper = {
                         r = 50 + Math.floor(Math.random() * 20) - 10; // Decreased from 60
                         g = 160 + Math.floor(Math.random() * 30) - 15; // Increased from 120
                         b = 60 + Math.floor(Math.random() * 20) - 10; // Increased from 50
+
+                    // Look for the fire state (metadata indicating burning)
+                    if (this.plant.core.metadata[index] > 0 && this.plant.core.metadata[index] <= 200) {
+                        // Plant is burning - calculate fire visualization
+                        const burnProgress = this.plant.core.metadata[index];
+                        const burnFactor = burnProgress / 200; // 0-1 scale
+
+                        // Fire coloring from orange to red
+                        const fireR = 255;
+                        const fireG = Math.max(40, Math.floor(200 - burnProgress)); // Yellow to red as it burns
+                        const fireB = Math.max(20, Math.floor(55 - burnProgress / 8));
+
+                        // Add flickering effect
+                        const flicker = Math.floor(Math.random() * 30) - 15;
+
+                        r = Math.min(255, fireR + flicker);
+                        g = Math.min(255, Math.max(0, fireG + flicker));
+                        b = Math.min(255, Math.max(0, fireB + flicker/2));
+
+                        // Occasionally add bright yellow-white tips for more convincing fire
+                        if (Math.random() < 0.2) {
+                            r = 255;
+                            g = 240 + Math.floor(Math.random() * 15);
+                            b = 160 + Math.floor(Math.random() * 40);
+                        }
+
+                        break;
+                    }
                 }
                 break;
 

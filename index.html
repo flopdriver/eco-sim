@@ -38,6 +38,9 @@
                     <div class="tool-button" data-tool="seed">
                         <span class="tool-icon">🌱</span>
                     </div>
+                    <div class="tool-button" data-tool="fire">
+                        <span class="tool-icon">🔥</span>
+                    </div>
                     <div class="tool-button" data-tool="dig">
                         <span class="tool-icon">🪨</span>
                     </div>
@@ -110,6 +113,13 @@
                         <span id="lightning-value">10%</span>
                     </label>
                     <input type="range" id="lightning-slider" min="0" max="100" value="10">
+                </div>
+                <div class="slider-control mini">
+                    <label>
+                        <span>Fire</span>
+                        <span id="fire-value">50%</span>
+                    </label>
+                    <input type="range" id="fire-slider" min="0" max="100" value="50">
                 </div>
             </div>
             
@@ -217,6 +227,7 @@
 <script src="js/environment/temperature-system.js"></script>
 <script src="js/environment/environment-controller.js"></script>
 <script src="js/environment/lightning-system.js"></script>
+<script src="js/environment/fire-system.js"></script>
 <!-- End of Environment System Components -->
 
 <!-- New modular physics system references -->

@@ -15,19 +15,6 @@ const LightningSystem = {
         strikeIntensity: 255,  // Maximum brightness of lightning
     },
 
-    // Fire properties
-    fireProperties: {
-        activeFires: new Set(), // Currently burning pixels
-        spreadProbability: 0.08, // Chance of fire spreading to neighboring plants
-        burnDuration: 60,      // How long a fire burns before dying out (frames)
-        maxFireSize: 300,      // Limit total fire size to prevent excessive burning
-        fireIntensity: 220,    // Fire visual intensity (0-255)
-    },
-
-    // Tracking for fire state in metadata
-    // Format: 0-200 = burn progress (0=start, 200=finished)
-    // We use this format to be compatible with the existing metadata array
-
     // Initialize lightning system
     init: function(environmentController) {
         this.environment = environmentController;
@@ -35,12 +22,9 @@ const LightningSystem = {
         return this;
     },
 
-    // Update lightning and fire effects
+    // Update lightning effects
     updateLightning: function(nextActivePixels) {
-        // First handle ongoing fires
-        this.updateFires(nextActivePixels);
-
-        // Then check for new lightning strikes
+        // Check for new lightning strikes
         this.generateLightning(nextActivePixels);
 
         // Update active lightning visuals
@@ -146,9 +130,11 @@ const LightningSystem = {
                     // Strike plants, water, or soil to potentially start fires
                     else if (!path[i].hasStruckTarget) {
                         if (core.type[index] === this.environment.TYPE.PLANT) {
-                            // Lightning strikes plant - start a fire
-                            this.startFire(index, nextActivePixels);
-                            path[i].hasStruckTarget = true;
+                            // Lightning strikes plant - start a fire using fire system
+                            if (this.environment.fireSystem) {
+                                this.environment.fireSystem.startFire(index, nextActivePixels);
+                                path[i].hasStruckTarget = true;
+                            }
                         }
                         else if (core.type[index] === this.environment.TYPE.WATER ||
                             core.type[index] === this.environment.TYPE.SOIL) {
@@ -180,201 +166,6 @@ const LightningSystem = {
             // Make the lightning flicker
             if (strike.lifetime % 2 === 0) {
                 this.illuminateLightningPath(strike.path, nextActivePixels);
-            }
-        }
-    },
-
-    // Start a fire at the given location
-    startFire: function(index, nextActivePixels) {
-        const core = this.environment.core;
-
-        // Only start fires in plants
-        if (core.type[index] !== this.environment.TYPE.PLANT) return;
-
-        // Initialize fire state in metadata
-        // Use metadata to track burn progress
-        core.metadata[index] = 1; // Just starting to burn
-
-        // Add to active fires set
-        this.fireProperties.activeFires.add(index);
-
-        // Add energy for fire visuals
-        core.energy[index] = this.fireProperties.fireIntensity;
-
-        // Generate some heat in air above for convection and visual effects
-        this.addHeatToSurroundingAir(index, nextActivePixels);
-
-        // Activate the pixel
-        nextActivePixels.add(index);
-    },
-
-    // Add heat to air above and around fire for convection effects
-    addHeatToSurroundingAir: function(index, nextActivePixels) {
-        const core = this.environment.core;
-        const coords = core.getCoords(index);
-
-        if (!coords) return;
-
-        // Apply heat to air pixels above and to the sides
-        for (let dy = -3; dy <= 0; dy++) {
-            for (let dx = -2; dx <= 2; dx++) {
-                // Skip the center (that's the fire itself)
-                if (dx === 0 && dy === 0) continue;
-
-                // Heat rises, so upper pixels get more heat
-                const heatFactor = (dy < 0) ? 1.0 - (dy / -5) : 0.3;
-
-                // Air farther to the sides gets less heat
-                const sideFactor = 1.0 - (Math.abs(dx) / 3);
-
-                // Get index of air pixel
-                const airX = coords.x + dx;
-                const airY = coords.y + dy;
-                const airIndex = core.getIndex(airX, airY);
-
-                if (airIndex !== -1 && core.type[airIndex] === this.environment.TYPE.AIR) {
-                    // Calculate heat level - base energy plus randomness
-                    const heatLevel = 170 + Math.floor(50 * heatFactor * sideFactor) + Math.floor(Math.random() * 30);
-
-                    // Add heat/energy to air pixel (for visual effects and air dynamics)
-                    core.energy[airIndex] = Math.max(core.energy[airIndex], heatLevel);
-
-                    // Random chance to create smoke (upward air movement)
-                    if (dy < 0 && Math.random() < 0.1 * heatFactor) {
-                        // Use water content to represent smoke density
-                        core.water[airIndex] = Math.min(30, core.water[airIndex] + 10);
-                    }
-
-                    // Activate this air pixel
-                    nextActivePixels.add(airIndex);
-                }
-            }
-        }
-    },
-
-    // Update all active fires
-    updateFires: function(nextActivePixels) {
-        const core = this.environment.core;
-
-        // Check if there are too many active fires - if so, reduce intensity
-        const fireRate = this.fireProperties.activeFires.size > this.fireProperties.maxFireSize ?
-            this.fireProperties.spreadProbability * 0.3 : // Reduced spread when fire is large
-            this.fireProperties.spreadProbability;        // Normal spread otherwise
-
-        // Process each active fire
-        const firesToRemove = [];
-
-        this.fireProperties.activeFires.forEach(index => {
-            // Skip invalid indices
-            if (index === -1) {
-                firesToRemove.push(index);
-                return;
-            }
-
-            // Get burn progress
-            const burnProgress = core.metadata[index];
-
-            // If no longer a plant or burning, remove from active fires
-            if (core.type[index] !== this.environment.TYPE.PLANT || burnProgress === 0) {
-                firesToRemove.push(index);
-                return;
-            }
-
-            // Update burn progress
-            const newProgress = Math.min(200, burnProgress + 2);
-            core.metadata[index] = newProgress;
-
-            // Make the plant look like it's burning
-            core.energy[index] = 220 - newProgress / 2; // Redder as it burns more
-
-            // If fully burned, convert to fertile soil
-            if (newProgress >= 200) {
-                // Convert to fertile soil with good nutrients
-                core.type[index] = this.environment.TYPE.SOIL;
-                core.state[index] = this.environment.STATE.FERTILE;
-                core.nutrient[index] = 150 + Math.floor(Math.random() * 50); // High nutrients from ash
-                core.water[index] = 10 + Math.floor(Math.random() * 20); // Some moisture remains
-                core.energy[index] = Math.floor(Math.random() * 30); // Ember glow
-
-                // Emit a bit of "ash" (dead matter) occasionally
-                if (Math.random() < 0.1) {
-                    const coords = core.getCoords(index);
-                    const upIndex = core.getIndex(coords.x, coords.y - 1);
-
-                    if (upIndex !== -1 && core.type[upIndex] === this.environment.TYPE.AIR) {
-                        core.type[upIndex] = this.environment.TYPE.DEAD_MATTER;
-                        core.nutrient[upIndex] = 50;
-                        core.energy[upIndex] = 10;
-                        nextActivePixels.add(upIndex);
-                    }
-                }
-
-                // Remove from active fires
-                firesToRemove.push(index);
-            }
-            else {
-                // Still burning - try to spread fire to neighboring plants
-                this.spreadFire(index, fireRate, nextActivePixels);
-            }
-
-            // Keep fire pixel active
-            nextActivePixels.add(index);
-        });
-
-        // Remove fires that are done
-        firesToRemove.forEach(index => {
-            this.fireProperties.activeFires.delete(index);
-        });
-    },
-
-    // Spread fire to neighboring plants
-    spreadFire: function(index, spreadRate, nextActivePixels) {
-        const core = this.environment.core;
-        const coords = core.getCoords(index);
-
-        if (!coords) return;
-
-        // Get burn progress - more advanced fires spread more
-        const burnProgress = core.metadata[index];
-        const isEstablishedFire = burnProgress > 50;
-
-        // Fire spreads upward and sideways more easily than downward
-        // Get neighbors with varying probabilities
-        const neighbors = core.getNeighborIndices(coords.x, coords.y);
-
-        for (const neighbor of neighbors) {
-            // Only spread to plants that aren't already burning
-            if (core.type[neighbor.index] === this.environment.TYPE.PLANT &&
-                (!core.metadata[neighbor.index] || core.metadata[neighbor.index] === 0)) {
-
-                // Direction-based spread adjustments
-                let directionalFactor = 1.0;
-
-                // Spreading to plants above is easier (heat rises)
-                if (neighbor.y < coords.y) {
-                    directionalFactor = 2.0;
-                }
-                // Spreading sideways is normal
-                else if (neighbor.y === coords.y) {
-                    directionalFactor = 1.0;
-                }
-                // Spreading downward is harder
-                else {
-                    directionalFactor = 0.5;
-                }
-
-                // Established fires spread more easily
-                if (isEstablishedFire) {
-                    directionalFactor *= 1.5;
-                }
-
-                // Calculate final spread chance
-                const spreadChance = spreadRate * directionalFactor;
-
-                // Try to spread fire with calculated probability
-                if (Math.random() < spreadChance) {
-                    this.startFire(neighbor.index, nextActivePixels);
-                }
             }
         }
     },
