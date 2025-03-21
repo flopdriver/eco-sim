@@ -1,0 +1,26 @@
+{
+  "name": "ecosim",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "test:watch": "jest --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/flopdriver/eco-sim.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/flopdriver/eco-sim/issues"
+  },
+  "homepage": "https://github.com/flopdriver/eco-sim#readme",
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

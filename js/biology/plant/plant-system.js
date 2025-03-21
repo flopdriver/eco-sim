@@ -755,3 +755,8 @@ const PlantSystem = {
         }
     }
 };
+
+// Make PlantSystem available for testing in Node.js environment
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = PlantSystem;
+}

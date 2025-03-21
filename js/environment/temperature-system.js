@@ -106,3 +106,13 @@ const TemperatureSystem = {
         }
     }
 };
+
+// Make TemperatureSystem available for testing in Node.js environment
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = TemperatureSystem;
+}
+
+// Make TemperatureSystem available for testing in Node.js environment
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = TemperatureSystem;
+}

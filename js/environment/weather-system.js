@@ -462,3 +462,13 @@ const WeatherSystem = {
         this.rainProperties.droplets = updatedDroplets;
     }
 };
+
+// Make WeatherSystem available for testing in Node.js environment
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = WeatherSystem;
+}
+
+// Make WeatherSystem available for testing in Node.js environment
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = WeatherSystem;
+}

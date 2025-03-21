@@ -222,3 +222,13 @@ const CoreSimulation = {
         return count;
     }
 };
+
+// Make CoreSimulation available for testing in Node.js environment
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = CoreSimulation;
+}
+
+// Make CoreSimulation available for testing in Node.js environment
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = CoreSimulation;
+}
