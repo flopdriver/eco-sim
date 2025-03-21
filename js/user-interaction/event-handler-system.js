@@ -143,7 +143,19 @@ window.EventHandlerSystem = {
         this.userInteraction.lastY = coords.y;
 
         // Apply tool at mouse position
+        const index = this.userInteraction.core.getIndex(coords.x, coords.y);
         this.userInteraction.toolSystem.applyTool(this.userInteraction.currentTool, coords.x, coords.y);
+        
+        // Check if hand tool is active and has a selection - if so, start drag
+        if (this.userInteraction.currentTool === 'hand' && this.userInteraction.selectedEntity && index !== -1) {
+            if (this.userInteraction.toolSystem.startEntityDrag) {
+                this.userInteraction.toolSystem.startEntityDrag(
+                    this.userInteraction.selectedEntity, 
+                    coords.x, 
+                    coords.y
+                );
+            }
+        }
     },
 
     // Handle mouse move event
@@ -156,25 +168,35 @@ window.EventHandlerSystem = {
             return;
         }
 
-        if (!this.userInteraction.isMouseDown) {
-            // Even when not dragging, update last position for better interaction
-            let coords;
-            if (window.ZoomController) {
-                coords = window.ZoomController.clientToSimCoordinates(event.clientX, event.clientY);
-            } else {
-                coords = this.userInteraction.getSimCoordinates(event);
-            }
-            this.userInteraction.lastX = coords.x;
-            this.userInteraction.lastY = coords.y;
-            return;
-        }
-
         // Get the simulation coordinates based on zoom/pan
         let coords;
         if (window.ZoomController) {
             coords = window.ZoomController.clientToSimCoordinates(event.clientX, event.clientY);
         } else {
             coords = this.userInteraction.getSimCoordinates(event);
+        }
+        
+        // Check if we're dragging with the hand tool
+        if (this.userInteraction.currentTool === 'hand' && 
+            this.userInteraction.toolSystem.draggedEntity &&
+            this.userInteraction.toolSystem.updateEntityDrag) {
+            
+            // Update the drag operation
+            const isDragging = this.userInteraction.toolSystem.updateEntityDrag(coords.x, coords.y);
+            
+            // If actively dragging, don't do normal tool application
+            if (isDragging) {
+                this.userInteraction.lastX = coords.x;
+                this.userInteraction.lastY = coords.y;
+                return;
+            }
+        }
+
+        if (!this.userInteraction.isMouseDown) {
+            // Even when not dragging, update last position for better interaction
+            this.userInteraction.lastX = coords.x;
+            this.userInteraction.lastY = coords.y;
+            return;
         }
 
         // Interpolate between last position and current position
@@ -198,6 +220,23 @@ window.EventHandlerSystem = {
         // End panning if we were panning
         if (window.ZoomController && window.ZoomController.isPanning) {
             window.ZoomController.endPan();
+        }
+
+        // Check if we're finishing a hand tool drag operation
+        if (this.userInteraction.currentTool === 'hand' && 
+            this.userInteraction.toolSystem.draggedEntity &&
+            this.userInteraction.toolSystem.completeEntityDrag) {
+            
+            // Get the final position coordinates
+            let coords;
+            if (window.ZoomController) {
+                coords = window.ZoomController.clientToSimCoordinates(event.clientX, event.clientY);
+            } else {
+                coords = this.userInteraction.getSimCoordinates(event);
+            }
+            
+            // Complete the drag operation
+            this.userInteraction.toolSystem.completeEntityDrag(coords.x, coords.y);
         }
 
         this.userInteraction.isMouseDown = false;

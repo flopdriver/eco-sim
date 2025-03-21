@@ -1,7 +1,7 @@
 // Plant System - main coordinator
 // This file handles initialization and updates for all plant subsystems
 
-const PlantSystem = {
+window.PlantSystem = {
     // Reference to parent biology system
     biology: null,
 
@@ -758,5 +758,5 @@ const PlantSystem = {
 
 // Make PlantSystem available for testing in Node.js environment
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = PlantSystem;
+    module.exports = window.PlantSystem;
 }

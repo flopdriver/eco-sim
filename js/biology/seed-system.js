@@ -42,19 +42,48 @@ const SeedSystem = {
         const currentLocation = this.core.type[index];
         const downLocation = downIndex !== -1 ? this.core.type[downIndex] : null;
 
+        // Check for fire-adapted seeds (marked with metadata value 200+)
+        const isFireAdapted = this.core.metadata[index] >= 200;
+        
+        // Check if this area has recently burned (using FireSystem if available)
+        let recentlyBurned = false;
+        if (window.ecosim && window.ecosim.environment && window.ecosim.environment.fireSystem) {
+            // Check current position
+            recentlyBurned = window.ecosim.environment.fireSystem.isRecentlyBurned(index);
+            
+            // If not burned at current position, check soil below
+            if (!recentlyBurned && downIndex !== -1) {
+                recentlyBurned = window.ecosim.environment.fireSystem.isRecentlyBurned(downIndex);
+            }
+        }
+
         // Case 1: Seed is on top of soil
         if (downIndex !== -1 && downLocation === this.TYPE.SOIL) {
             // More generous water requirement for germination
             if (this.core.water[downIndex] > 25) { // Reduced from 50 to 25
-                // Dramatically increased chance to germinate for Jumanji-like growth
-                if (Math.random() < 0.45 * this.biology.growthRate) { // Massively increased from 0.25 to 0.45
+                // Base germination chance
+                let germinationChance = 0.45 * this.biology.growthRate; // Massively increased from 0.25 to 0.45
+                
+                // Fire-adapted seeds in recently burned areas get a boost
+                if (isFireAdapted && recentlyBurned) {
+                    germinationChance *= 2.0; // Double germination chance for fire-adapted seeds in burned areas
+                    console.log("Fire-adapted seed germinating in recently burned area");
+                }
+                
+                if (Math.random() < germinationChance) {
                     // Convert seed to plant root
                     this.core.type[index] = this.TYPE.PLANT;
                     this.core.state[index] = this.STATE.ROOT;
 
                     // Initial root has more water and energy
                     this.core.water[index] = 80; // Increased from 50
-                    this.core.energy[index] = Math.max(this.core.energy[index], 150); // Adding initial energy
+                    
+                    // Fire-adapted plants in burned areas start with more energy
+                    let initialEnergy = 150;
+                    if (isFireAdapted && recentlyBurned) {
+                        initialEnergy = 250; // Extra energy for fire-adapted plants in burned areas
+                    }
+                    this.core.energy[index] = Math.max(this.core.energy[index], initialEnergy);
                     
                     // Record the origin of this plant for trunk positioning
                     const plantGroupId = this.biology.plantSystem.nextPlantGroupId++;
@@ -65,7 +94,7 @@ const SeedSystem = {
                     let speciesIndex;
                     
                     // Check if this seed came from a flower with specific traits (inherit from parent)
-                    if (this.core.metadata[index] > 0) {
+                    if (this.core.metadata[index] > 0 && this.core.metadata[index] < 200) {
                         // Extract the flower type from metadata (high 4 bits)
                         const flowerType = (this.core.metadata[index] >> 4) & 0xF;
                         // Match flower type to corresponding plant species
@@ -77,6 +106,13 @@ const SeedSystem = {
                     
                     // Store species information for this plant group
                     this.biology.plantSystem.plantSpeciesMap[plantGroupId] = speciesIndex;
+                    
+                    // Mark fire adaptation in the plant if the seed was fire-adapted
+                    if (isFireAdapted) {
+                        // Keep the fire adaptation metadata (200+) in the plant
+                        // We're keeping the value consistent for ease of tracking
+                        this.core.metadata[index] = 200;
+                    }
 
                     nextActivePixels.add(index);
                     return;
@@ -93,12 +129,22 @@ const SeedSystem = {
             
             // Higher germination chance when buried in soil with water
             if (surroundingWater > 20) { // Reduced from 30 to 20
-                // Dramatically increased chance to germinate for aggressive Jumanji-style growth
+                // Base germination chance
                 let germinationChance = 0.55 * this.biology.growthRate; // Massively increased from 0.35 to 0.55
                 
                 // Seeds too deep struggle to germinate - but still possible
                 if (soilDepth > 5) {
-                    germinationChance *= 0.7; // Increased from 0.5 to 0.7
+                    // Fire-adapted seeds are better at germinating even when buried deep
+                    if (isFireAdapted) {
+                        germinationChance *= 0.9; // Less penalty for fire-adapted seeds
+                    } else {
+                        germinationChance *= 0.7; // Regular seeds penalty
+                    }
+                }
+                
+                // Fire-adapted seeds in recently burned areas get a boost
+                if (isFireAdapted && recentlyBurned) {
+                    germinationChance *= 2.0; // Double germination chance
                 }
                 
                 if (Math.random() < germinationChance) {
@@ -109,8 +155,16 @@ const SeedSystem = {
                     // Initial root has water based on surrounding soil
                     this.core.water[index] = Math.min(150, surroundingWater * 2); // Increased water amount
 
+                    // Base energy for roots from buried seeds
+                    let initialEnergy = 200;
+                    
+                    // Fire-adapted plants in burned areas start with more energy
+                    if (isFireAdapted && recentlyBurned) {
+                        initialEnergy = 300; // Even more energy for fire-adapted plants in burned soil
+                    }
+                    
                     // Roots from buried seeds start with extra energy
-                    this.core.energy[index] = Math.max(this.core.energy[index], 200); // Increased energy
+                    this.core.energy[index] = Math.max(this.core.energy[index], initialEnergy);
                     
                     // Record the origin of this plant for trunk positioning
                     const plantGroupId = this.biology.plantSystem.nextPlantGroupId++;
@@ -121,7 +175,7 @@ const SeedSystem = {
                     let speciesIndex;
                     
                     // Check if this seed came from a flower with specific traits
-                    if (this.core.metadata[index] > 0) {
+                    if (this.core.metadata[index] > 0 && this.core.metadata[index] < 200) {
                         // Extract the flower type from metadata (high 4 bits)
                         const flowerType = (this.core.metadata[index] >> 4) & 0xF;
                         // Match flower type to corresponding plant species
@@ -133,6 +187,12 @@ const SeedSystem = {
                     
                     // Store species information for this plant group
                     this.biology.plantSystem.plantSpeciesMap[plantGroupId] = speciesIndex;
+                    
+                    // Mark fire adaptation in the plant if the seed was fire-adapted
+                    if (isFireAdapted) {
+                        // Keep the fire adaptation metadata (200+) in the plant
+                        this.core.metadata[index] = 200;
+                    }
 
                     nextActivePixels.add(index);
                     return;
@@ -141,7 +201,21 @@ const SeedSystem = {
             
             // Seeds that are too deep may decompose faster
             if (soilDepth > 8) {
-                this.core.energy[index] -= 0.2 * this.biology.metabolism;
+                // Fire-adapted seeds are more resilient to being buried deep
+                if (isFireAdapted) {
+                    this.core.energy[index] -= 0.1 * this.biology.metabolism; // Less energy loss
+                } else {
+                    this.core.energy[index] -= 0.2 * this.biology.metabolism; // Regular energy loss
+                }
+            }
+        }
+        
+        // Special case: Check for fire adaptation development in recently burned areas
+        if (recentlyBurned && !isFireAdapted && window.ecosim && window.ecosim.environment && window.ecosim.environment.fireSystem) {
+            // Chance for seed to develop fire adaptation in recently burned areas
+            if (window.ecosim.environment.fireSystem.processFireAdaptations(index, index, nextActivePixels)) {
+                // The processFireAdaptations function will modify metadata if adaptation happens
+                console.log("Seed developed fire adaptation in recently burned area");
             }
         }
 
@@ -232,3 +306,13 @@ const SeedSystem = {
         return depth;
     }
 };
+
+// Make the module available for testing in Node.js environment
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SeedSystem;
+}
+
+// Make the module available for testing in Node.js environment
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SeedSystem;
+}

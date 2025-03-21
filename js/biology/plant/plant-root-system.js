@@ -1,7 +1,7 @@
 // Plant Root System
 // Handles plant root growth, water/nutrient absorption
 
-const PlantRootSystem = {
+window.PlantRootSystem = {
     // Reference to parent plant system
     plant: null,
 

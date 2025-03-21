@@ -1,7 +1,7 @@
 // Plant Flower System
 // Handles plant flower reproduction and seed creation
 
-const PlantFlowerSystem = {
+window.PlantFlowerSystem = {
     // Reference to parent plant system
     plant: null,
     

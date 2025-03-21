@@ -191,11 +191,31 @@ const WormSystem = {
                 // Leave aerated soil behind
                 this.core.type[index] = this.TYPE.SOIL;
                 this.core.state[index] = this.STATE.FERTILE;
+                
+                // Mark soil as having worm tunnels for improved drainage
+                this.core.metadata[index] = 1;
 
                 // If original was soil, preserve some properties
                 if (originalType === this.TYPE.SOIL) {
                     // Keep nutrients but add some aeration benefit
                     this.core.nutrient[index] = originalNutrient + 5;
+                    
+                    // If this was a special soil type, preserve some properties
+                    if (originalState === this.STATE.CLAY || 
+                        originalState === this.STATE.SANDY ||
+                        originalState === this.STATE.LOAMY ||
+                        originalState === this.STATE.ROCKY) {
+                        
+                        // Worms improve soil structure - change clay to loamy in some cases
+                        // Clay soil becomes more loamy with worm activity
+                        if (originalState === this.STATE.CLAY && Math.random() < 0.3) {
+                            this.core.state[index] = this.STATE.LOAMY;
+                        } else {
+                            // Still fertile but maintain the original soil type in metadata
+                            // This shows the worm effect but preserves soil layer information
+                            this.core.metadata[index] = originalState;
+                        }
+                    }
                 } else if (originalType === this.TYPE.DEAD_MATTER) {
                     // Create fertile soil from dead matter
                     this.core.nutrient[index] = 300;

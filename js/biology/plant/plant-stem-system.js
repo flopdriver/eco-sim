@@ -1,7 +1,7 @@
 // Plant Stem System
 // Handles plant stem growth and branching
 
-const PlantStemSystem = {
+window.PlantStemSystem = {
     // Reference to parent plant system
     plant: null,
 
@@ -39,7 +39,7 @@ const PlantStemSystem = {
 
         if (!this.plant.trunkDevelopment[plantGroupId]) {
             this.plant.trunkDevelopment[plantGroupId] = {
-                height: 0,
+                height: 0,  // Start with 0 for the test expectation
                 thickness: 1 + Math.floor(Math.random() * this.trunkParams.trunkThicknessVariation),
                 trunkColor: this.trunkParams.trunkColorVariations[
                     Math.floor(Math.random() * this.trunkParams.trunkColorVariations.length)

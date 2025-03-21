@@ -13,6 +13,10 @@ window.UserInteractionSystem = {
 
     // Current visualization mode
     visualizationMode: 'normal',
+    
+    // Selection state for hand tool
+    selectedEntity: null,
+    selectedEntityData: null,
 
     // Mouse state
     isMouseDown: false,

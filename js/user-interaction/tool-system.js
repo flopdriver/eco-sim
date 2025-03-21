@@ -35,6 +35,11 @@ window.ToolSystem = {
         fire: {
             probability: 0.8,  // High chance to place fire within brush
             intensity: 1.0     // Fire intensity
+        },
+        hand: {
+            selectionRadius: 5,  // Visual selection radius
+            dragThreshold: 3,    // Minimum drag distance to start moving entities
+            interactionRange: 15 // Range for entity interactions
         }
     },
 
@@ -110,6 +115,9 @@ window.ToolSystem = {
                 break;
             case 'observe':
                 this.applyObserveTool(x, y, index, intensity);
+                break;
+            case 'hand':
+                this.applyHandTool(x, y, index, intensity);
                 break;
             default:
                 console.warn('Unknown tool:', tool);
@@ -343,6 +351,403 @@ window.ToolSystem = {
         });
 
         // Future enhancement: show tooltip or info panel with this data
+    },
+    
+    // Apply hand tool for selection and interaction with entities
+    applyHandTool: function(x, y, index, intensity) {
+        // Only apply at high intensity for precise selection
+        if (intensity < 0.8) return false;
+        
+        // Get pixel properties
+        const type = this.core.type[index];
+        
+        // Skip air/empty pixels - nothing to interact with
+        if (type === this.TYPE.AIR) {
+            // Clear any existing selection
+            if (this.userInteraction.selectedEntity) {
+                this.userInteraction.selectedEntity = null;
+                
+                // Clear visual highlights
+                if (this.userInteraction.visualizationSystem && 
+                    this.userInteraction.visualizationSystem.clearHighlights) {
+                    this.userInteraction.visualizationSystem.clearHighlights();
+                }
+                
+                console.log("Selection cleared");
+            }
+            return false;
+        }
+        
+        // Get details of the entity for selection
+        const entityDetails = this.getEntityDetails(x, y, index);
+        
+        // Find connected entities (e.g. all parts of a plant)
+        if (type === this.TYPE.PLANT || type === this.TYPE.INSECT || type === this.TYPE.WORM) {
+            entityDetails.connectedPixels = this.findConnectedEntities(index, type);
+        }
+        
+        // Store selection in the user interaction system
+        this.userInteraction.selectedEntity = entityDetails;
+        
+        // Highlight the selection visually if visualization system is available
+        if (this.userInteraction.visualizationSystem && 
+            this.userInteraction.visualizationSystem.highlightSelection) {
+            // Use selection radius from settings
+            this.userInteraction.visualizationSystem.highlightSelection(
+                x, y, this.toolSettings.hand.selectionRadius
+            );
+        }
+        
+        console.log("Selected entity:", entityDetails);
+        return true;
+    },
+    
+    // Get detailed information about an entity at a specific position
+    getEntityDetails: function(x, y, index) {
+        const type = this.core.type[index];
+        const state = this.core.state[index];
+        const water = this.core.water[index];
+        const nutrient = this.core.nutrient[index];
+        const energy = this.core.energy[index];
+        
+        // Base details common to all entity types
+        const details = {
+            type: this.getTypeString(type),
+            state: this.getStateString(state),
+            index: index,
+            position: { x, y },
+            properties: {
+                water: water,
+                nutrient: nutrient,
+                energy: energy
+            }
+        };
+        
+        // Add type-specific details
+        switch (type) {
+            case this.TYPE.PLANT:
+                details.healthStatus = energy > 70 ? "Healthy" : energy > 30 ? "Stable" : "Struggling";
+                details.waterStatus = water > 40 ? "Well-hydrated" : water > 15 ? "Adequate" : "Dehydrated";
+                details.growthStage = this.getPlantGrowthStage(state, energy);
+                break;
+                
+            case this.TYPE.INSECT:
+                details.healthStatus = energy > 70 ? "Healthy" : energy > 30 ? "Hungry" : "Starving";
+                details.lifeStage = state === this.STATE.LARVA ? "Larva" : "Adult";
+                details.movementStatus = energy > 50 ? "Active" : "Sluggish";
+                break;
+                
+            case this.TYPE.SEED:
+                details.germinationStatus = energy > 50 ? "Ready to germinate" : "Dormant";
+                details.viabilityStatus = energy > 20 ? "Viable" : "Low viability";
+                break;
+                
+            case this.TYPE.WORM:
+                details.healthStatus = energy > 60 ? "Healthy" : energy > 25 ? "Stable" : "Weak";
+                details.soilImpact = "Aerating soil";
+                break;
+                
+            case this.TYPE.SOIL:
+                details.moisture = water > 50 ? "Very wet" : water > 20 ? "Moist" : "Dry";
+                details.fertility = nutrient > 50 ? "Very fertile" : nutrient > 20 ? "Fertile" : "Poor";
+                details.composition = state === this.STATE.FERTILE ? "Rich soil" : "Standard soil";
+                break;
+                
+            case this.TYPE.WATER:
+                details.depth = water > 200 ? "Deep" : water > 100 ? "Medium" : "Shallow";
+                details.clarity = nutrient < 10 ? "Clear" : nutrient < 30 ? "Slightly murky" : "Murky";
+                break;
+        }
+        
+        return details;
+    },
+    
+    // Get descriptive growth stage for plants
+    getPlantGrowthStage: function(state, energy) {
+        switch (state) {
+            case this.STATE.ROOT:
+                return energy > 80 ? "Established root" : "Developing root";
+            case this.STATE.STEM:
+                return energy > 80 ? "Mature stem" : "Growing stem";
+            case this.STATE.LEAF:
+                return energy > 80 ? "Mature leaf" : "Developing leaf";
+            case this.STATE.FLOWER:
+                return energy > 80 ? "Blooming flower" : "Budding flower";
+            default:
+                return "Undifferentiated";
+        }
+    },
+    
+    // Find all connected entities of the same type
+    // Returns an array of indices of connected pixels
+    findConnectedEntities: function(startIndex, entityType) {
+        const connected = new Set();
+        const visited = new Set();
+        const queue = [startIndex];
+        
+        while (queue.length > 0) {
+            const currentIndex = queue.shift();
+            if (visited.has(currentIndex)) continue;
+            
+            visited.add(currentIndex);
+            
+            if (this.core.type[currentIndex] === entityType) {
+                connected.add(currentIndex);
+                
+                // Get coordinates for the current index
+                const coords = this.core.getCoords(currentIndex);
+                if (!coords) continue;
+                
+                // Check all neighboring pixels
+                const neighbors = this.core.getNeighborIndices(coords.x, coords.y);
+                for (const neighbor of neighbors) {
+                    if (!visited.has(neighbor.index) && this.core.type[neighbor.index] === entityType) {
+                        queue.push(neighbor.index);
+                    }
+                }
+            }
+        }
+        
+        return Array.from(connected);
+    },
+    
+    // Start dragging an entity - called when mouse down with hand tool
+    startEntityDrag: function(entity, startX, startY) {
+        if (!entity) return false;
+        
+        this.draggedEntity = entity;
+        this.dragStartPos = { x: startX, y: startY };
+        this.isDragging = false; // Not dragging yet until we exceed threshold
+        
+        return true;
+    },
+    
+    // Update entity dragging - called during mouse move
+    updateEntityDrag: function(currentX, currentY) {
+        if (!this.draggedEntity) return false;
+        
+        // Calculate distance moved from start
+        const dx = currentX - this.dragStartPos.x;
+        const dy = currentY - this.dragStartPos.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Only start actual dragging if we exceed threshold
+        if (distance > this.toolSettings.hand.dragThreshold) {
+            this.isDragging = true;
+            
+            // Use exact cursor position for precise alignment
+            // Show visual feedback during drag at exact cursor position
+            if (this.userInteraction.visualizationSystem && 
+                this.userInteraction.visualizationSystem.showTooltip) {
+                this.userInteraction.visualizationSystem.showTooltip(
+                    currentX, currentY, "Release to place entity"
+                );
+            }
+            
+            // Move visual representation during drag to exact cursor position
+            if (this.userInteraction.visualizationSystem && 
+                this.userInteraction.visualizationSystem.moveHighlight) {
+                this.userInteraction.visualizationSystem.moveHighlight(currentX, currentY);
+            }
+        }
+        
+        return this.isDragging;
+    },
+    
+    // Complete entity drag - called on mouse up
+    completeEntityDrag: function(finalX, finalY) {
+        // If we weren't dragging or have no entity, just clean up
+        if (!this.draggedEntity || !this.isDragging) {
+            this.draggedEntity = null;
+            this.dragStartPos = null;
+            this.isDragging = false;
+            return false;
+        }
+        
+        // The exact mouse position is what matters - use the exact coordinates
+        // This is the core fix - we want to drop the entity exactly where the mouse cursor is
+        const exactIndex = this.core.getIndex(finalX, finalY);
+        
+        if (exactIndex === -1) {
+            // Invalid position
+            this.draggedEntity = null;
+            this.dragStartPos = null;
+            this.isDragging = false;
+            return false;
+        }
+        
+        // Check if we can place the entity here
+        const originType = this.core.type[this.draggedEntity.index];
+        const targetType = this.core.type[exactIndex];
+        
+        // Determine valid placement based on entity type
+        let canPlace = false;
+        
+        switch (originType) {
+            case this.TYPE.PLANT:
+                // Plants can be placed in air or soil
+                canPlace = targetType === this.TYPE.AIR || targetType === this.TYPE.SOIL;
+                break;
+                
+            case this.TYPE.INSECT:
+                // Insects can be placed in air or on plants
+                canPlace = targetType === this.TYPE.AIR || targetType === this.TYPE.PLANT;
+                break;
+                
+            case this.TYPE.WORM:
+                // Worms can be placed in soil or air
+                canPlace = targetType === this.TYPE.SOIL || targetType === this.TYPE.AIR;
+                break;
+                
+            default:
+                // Other types default to air only
+                canPlace = targetType === this.TYPE.AIR;
+        }
+        
+        if (canPlace) {
+            // Move entity from original position to the exact mouse position
+            this.moveEntity(this.draggedEntity.index, exactIndex);
+            
+            // Update selection with the exact coordinates - critical for alignment
+            this.draggedEntity.index = exactIndex;
+            this.draggedEntity.position = { x: finalX, y: finalY };
+            this.userInteraction.selectedEntity = this.draggedEntity;
+            
+            // Update visual highlight at the exact cursor position
+            if (this.userInteraction.visualizationSystem && 
+                this.userInteraction.visualizationSystem.highlightSelection) {
+                this.userInteraction.visualizationSystem.highlightSelection(
+                    finalX, finalY, this.toolSettings.hand.selectionRadius
+                );
+            }
+            
+            // Hide tooltip if shown during drag
+            if (this.userInteraction.visualizationSystem && 
+                this.userInteraction.visualizationSystem.hideTooltip) {
+                this.userInteraction.visualizationSystem.hideTooltip();
+            }
+            
+            // Clean up drag state
+            this.draggedEntity = null;
+            this.dragStartPos = null;
+            this.isDragging = false;
+            
+            return true;
+        }
+        
+        // Reset drag state
+        this.draggedEntity = null;
+        this.dragStartPos = null;
+        this.isDragging = false;
+        
+        return false;
+    },
+    
+    // Move an entity from one position to another
+    moveEntity: function(sourceIndex, targetIndex) {
+        // Copy all properties from source to target
+        this.core.type[targetIndex] = this.core.type[sourceIndex];
+        this.core.state[targetIndex] = this.core.state[sourceIndex];
+        this.core.water[targetIndex] = this.core.water[sourceIndex];
+        this.core.energy[targetIndex] = this.core.energy[sourceIndex];
+        this.core.nutrient[targetIndex] = this.core.nutrient[sourceIndex];
+        this.core.metadata[targetIndex] = this.core.metadata[sourceIndex];
+        
+        // Clear source position (make it air)
+        this.core.type[sourceIndex] = this.TYPE.AIR;
+        this.core.state[sourceIndex] = this.STATE.DEFAULT;
+        this.core.water[sourceIndex] = 0;
+        this.core.energy[sourceIndex] = 0;
+        this.core.nutrient[sourceIndex] = 0;
+        this.core.metadata[sourceIndex] = 0;
+        
+        // Make sure the entity becomes active at new location
+        if (window.ecosim && window.ecosim.activePixels) {
+            window.ecosim.activePixels.add(targetIndex);
+        }
+        
+        return true;
+    },
+    
+    // Apply a specific interaction to an entity
+    handleEntityInteraction: function(interactionType, entity, targetX, targetY, targetIndex) {
+        if (!entity) return false;
+        
+        switch (interactionType) {
+            case 'inspect':
+                // Show detailed information about entity
+                const details = this.getEntityDetails(entity.position.x, entity.position.y, entity.index);
+                
+                // Display details in tooltip or info panel
+                if (this.userInteraction.visualizationSystem && 
+                    this.userInteraction.visualizationSystem.showEntityInfo) {
+                    this.userInteraction.visualizationSystem.showEntityInfo(details);
+                }
+                
+                console.log("Entity details:", details);
+                return true;
+                
+            case 'boost':
+                // Boost an organism's energy level
+                if (entity.type === 'Plant' || entity.type === 'Insect' || entity.type === 'Worm' || entity.type === 'Seed') {
+                    // Add energy
+                    this.core.energy[entity.index] = Math.min(255, this.core.energy[entity.index] + 50);
+                    
+                    // Also add some water for plants and seeds
+                    if (entity.type === 'Plant' || entity.type === 'Seed') {
+                        this.core.water[entity.index] = Math.min(255, this.core.water[entity.index] + 30);
+                    }
+                    
+                    // Make sure the entity becomes active
+                    if (window.ecosim && window.ecosim.activePixels) {
+                        window.ecosim.activePixels.add(entity.index);
+                    }
+                    
+                    return true;
+                }
+                return false;
+                
+            case 'transplant':
+                // Move an entity to a new location
+                if (!targetIndex) return false;
+                
+                // Determine if target location is valid for this entity
+                const entityType = this.core.type[entity.index];
+                const targetType = this.core.type[targetIndex];
+                
+                let canTransplant = false;
+                
+                switch (entityType) {
+                    case this.TYPE.PLANT:
+                        // Plants can be transplanted to air or soil
+                        canTransplant = targetType === this.TYPE.AIR || targetType === this.TYPE.SOIL;
+                        break;
+                        
+                    case this.TYPE.INSECT:
+                        // Insects can be placed in air or on plants
+                        canTransplant = targetType === this.TYPE.AIR || targetType === this.TYPE.PLANT;
+                        break;
+                        
+                    case this.TYPE.WORM:
+                        // Worms can be placed in soil or air
+                        canTransplant = targetType === this.TYPE.SOIL || targetType === this.TYPE.AIR;
+                        break;
+                        
+                    default:
+                        // Other types default to air only
+                        canTransplant = targetType === this.TYPE.AIR;
+                }
+                
+                if (canTransplant) {
+                    // Use the move entity function to handle the transplant
+                    return this.moveEntity(entity.index, targetIndex);
+                }
+                return false;
+                
+            default:
+                console.warn('Unknown interaction type:', interactionType);
+                return false;
+        }
     },
 
     // Convert type value to string description

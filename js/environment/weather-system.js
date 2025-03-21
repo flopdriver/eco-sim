@@ -14,7 +14,7 @@ const WeatherSystem = {
         upperLayerColor: null, // Upper layer cloud color
         lowerLayerColor: null, // Lower layer cloud color
         movementSpeed: 0.5,    // Cloud movement speed
-        cloudDensity: 0.9      // Cloud density factor
+        cloudDensity: 5.9      // Cloud density factor
     },
 
     // Rain properties - dramatically enhanced for Jumanji-style downpours

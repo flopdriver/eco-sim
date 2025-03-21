@@ -73,19 +73,13 @@ window.EnvironmentController = {
 
     // Update UI elements related to environment
     updateUI: function() {
-        // Update daylight indicator
-        const dayPercent = (this.dayNightCycle / 256) * 100;
-        const timeOfDay = Math.floor((this.dayNightCycle / 256) * 24); // 24-hour format
+        // Get formatted time string
+        const timeString = this.dayNightSystem.getTimeString();
 
-        // Format time as HH:MM
-        const hours = timeOfDay;
-        const minutes = Math.floor((this.dayNightCycle / 256 * 24 * 60) % 60);
-        const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-
-        // Update time indicator if it exists
-        const timeIndicator = document.getElementById('time-indicator');
-        if (timeIndicator) {
-            timeIndicator.textContent = timeString;
+        // Update day-night indicator in stats overlay
+        const indicator = document.getElementById('day-night-indicator');
+        if (indicator) {
+            indicator.textContent = timeString;
         }
     },
 

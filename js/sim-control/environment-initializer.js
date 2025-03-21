@@ -62,27 +62,170 @@ const EnvironmentInitializer = {
                 const index = core.getIndex(x, y);
                 core.type[index] = TYPE.SOIL;
 
-                // Add variation to soil - some dry, some wet, some fertile
-                const soilRandom = Math.random();
-                if (soilRandom < 0.15) { // Increased chance for fertile soil
-                    // Fertile soil patches
-                    core.state[index] = STATE.FERTILE;
-                    core.nutrient[index] = 70 + Math.floor(Math.random() * 50);
+                // First determine soil layer type based on depth and position
+                const depth = (y - groundLevel) / (core.height - groundLevel);
+                
+                // Determine soil layer type using the physics soil moisture system
+                // if it's available, otherwise use a simpler approach
+                let soilState;
+                if (this.controller.physics && 
+                    this.controller.physics.soilMoistureSystem &&
+                    typeof this.controller.physics.soilMoistureSystem.determineSoilLayer === 'function') {
+                    
+                    // Use the soil moisture system's layer determination
+                    soilState = this.controller.physics.soilMoistureSystem.determineSoilLayer(x, y);
                 } else {
-                    // Regular soil - drier near surface, wetter deep down
-                    const depth = (y - groundLevel) / (core.height - groundLevel);
-
-                    // Add some randomness to soil moisture
-                    const moistureVariation = Math.random() * 0.4 - 0.2; // -0.2 to 0.2 variation
-                    const moistureDepth = Math.min(1, depth + moistureVariation);
-
-                    core.state[index] = moistureDepth > 0.3 ? STATE.WET : STATE.DRY;
-
-                    // Water increases with depth, with added variation
-                    core.water[index] = Math.floor(moistureDepth * 150 * (0.8 + Math.random() * 0.4));
-
-                    // Nutrients vary randomly with slight depth influence
-                    core.nutrient[index] = 30 + Math.floor(Math.random() * 40 * (1 + depth));
+                    // Fallback implementation with random deposits if soil moisture system not initialized yet
+                    const depthFromSurface = y - groundLevel;
+                    
+                    // Create deposit influence using simple noise
+                    const noiseX = Math.sin(x * 0.053) * Math.cos(y * 0.071) * 50;
+                    const noiseY = Math.cos(x * 0.067) * Math.sin(y * 0.059) * 50;
+                    const depositNoise = (Math.sin(noiseX) + Math.cos(noiseY)) * 50 + 50; // 0-100 range
+                    
+                    // Create varied soil pockets
+                    const pocketSeed = Math.sin(x * 0.029 + y * 0.037) * 100;
+                    const smallDeposit = Math.abs(Math.sin(x * 0.13 + y * 0.17) * 100);
+                    const mediumDeposit = Math.abs(Math.cos(x * 0.07 + y * 0.11) * 100);
+                    const largeDeposit = Math.abs(Math.sin(x * 0.05 + y * 0.03) * 100);
+                    
+                    // Layer influences
+                    const clayInfluence = (depthFromSurface > 15 && depthFromSurface < 40) ? 
+                                       mediumDeposit * 0.3 : smallDeposit * 0.1;
+                                       
+                    const sandyInfluence = (depthFromSurface < 12 || depthFromSurface > 35) ? 
+                                        largeDeposit * 0.3 : smallDeposit * 0.1;
+                                       
+                    const rockyInfluence = depthFromSurface > 25 ? 
+                                        Math.min(100, mediumDeposit * (depthFromSurface / 60)) : 
+                                        smallDeposit * 0.05;
+                    
+                    // Final soil type selection with deposits
+                    const hash = (depositNoise + pocketSeed) % 100;
+                    
+                    // Clay deposit check
+                    if (clayInfluence > 60) {
+                        soilState = STATE.CLAY;
+                    }
+                    // Sandy deposit check
+                    else if (sandyInfluence > 65) {
+                        soilState = STATE.SANDY;
+                    }
+                    // Rocky deposit check
+                    else if (rockyInfluence > 70) {
+                        soilState = STATE.ROCKY;
+                    }
+                    // Base layer distribution by depth if not in a deposit pocket
+                    else if (depthFromSurface < 10) {
+                        // Topsoil - mostly loamy with some sandy and default
+                        if (hash < 60) soilState = STATE.LOAMY;
+                        else if (hash < 75) soilState = STATE.SANDY;
+                        else if (hash < 80) soilState = STATE.CLAY;
+                        else soilState = STATE.DEFAULT;
+                    } 
+                    else if (depthFromSurface < 30) {
+                        // Subsoil - mix of types with more clay
+                        if (hash < 40) soilState = STATE.LOAMY;
+                        else if (hash < 65) soilState = STATE.SANDY;
+                        else if (hash < 85) soilState = STATE.CLAY;
+                        else if (hash < 90) soilState = STATE.ROCKY;
+                        else soilState = STATE.DEFAULT;
+                    }
+                    else {
+                        // Deep soil - more rocky and sandy with some clay
+                        if (hash < 15) soilState = STATE.LOAMY;
+                        else if (hash < 45) soilState = STATE.SANDY;
+                        else if (hash < 65) soilState = STATE.CLAY;
+                        else if (hash < 95) soilState = STATE.ROCKY;
+                        else soilState = STATE.DEFAULT;
+                    }
+                }
+                
+                // Sometimes override with fertile soil regardless of layer type
+                const soilRandom = Math.random();
+                if (soilRandom < 0.15) { // Chance for fertile soil
+                    // Fertile soil patches
+                    soilState = STATE.FERTILE;
+                    core.nutrient[index] = 70 + Math.floor(Math.random() * 50);
+                }
+                
+                // Set the soil state
+                core.state[index] = soilState;
+                
+                // Add water content based on soil type and depth
+                
+                // Base water content increases with depth
+                const baseWaterContent = Math.floor(depth * 150 * (0.8 + Math.random() * 0.4));
+                
+                // Adjust water content based on soil type
+                let waterMultiplier = 1.0;
+                
+                switch (soilState) {
+                    case STATE.CLAY:
+                        // Clay holds water well
+                        waterMultiplier = 1.4;
+                        break;
+                    case STATE.SANDY:
+                        // Sandy soil drains quickly, holds less water
+                        waterMultiplier = 0.6;
+                        break;
+                    case STATE.LOAMY:
+                        // Loamy soil holds a good amount of water
+                        waterMultiplier = 1.1;
+                        break;
+                    case STATE.ROCKY:
+                        // Rocky soil drains very quickly
+                        waterMultiplier = 0.4;
+                        break;
+                    case STATE.FERTILE:
+                        // Fertile soil holds water well
+                        waterMultiplier = 1.2;
+                        break;
+                }
+                
+                // Calculate final water content
+                core.water[index] = Math.floor(baseWaterContent * waterMultiplier);
+                
+                // Update WET/DRY state for non-layer-type soil
+                if (soilState === STATE.DEFAULT || soilState === STATE.FERTILE) {
+                    if (core.water[index] > 20) {
+                        // Only set WET state if not already a special soil type
+                        if (soilState === STATE.DEFAULT) {
+                            core.state[index] = STATE.WET;
+                        }
+                    } else if (soilState === STATE.DEFAULT) {
+                        core.state[index] = STATE.DRY;
+                    }
+                }
+                
+                // Nutrients vary by soil type
+                let nutrientBase = 30;
+                switch (soilState) {
+                    case STATE.CLAY:
+                        // Clay can be rich in nutrients
+                        nutrientBase = 40;
+                        break;
+                    case STATE.SANDY:
+                        // Sandy soil has fewer nutrients
+                        nutrientBase = 20;
+                        break;
+                    case STATE.LOAMY:
+                        // Loamy soil is nutrient-rich
+                        nutrientBase = 50;
+                        break;
+                    case STATE.ROCKY:
+                        // Rocky soil has very few nutrients
+                        nutrientBase = 15;
+                        break;
+                    case STATE.FERTILE:
+                        // Fertile soil already has high nutrients
+                        nutrientBase = 70;
+                        break;
+                }
+                
+                // Add depth influence and randomness
+                if (soilState !== STATE.FERTILE) { // Skip if already set by fertile soil
+                    core.nutrient[index] = nutrientBase + Math.floor(Math.random() * 30 * (1 + depth));
                 }
 
                 // Mark as active for first update

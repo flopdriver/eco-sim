@@ -95,7 +95,11 @@ const SimulationController = {
             FLOWER: 7,
             LARVA: 8,
             ADULT: 9,
-            DECOMPOSING: 10
+            DECOMPOSING: 10,
+            CLAY: 11,     // Clay soil type (poor drainage)
+            SANDY: 12,    // Sandy soil type (good drainage)
+            LOAMY: 13,    // Loamy soil type (balanced retention and drainage)
+            ROCKY: 14     // Rocky soil type (excellent drainage, poor retention)
         };
     },
 

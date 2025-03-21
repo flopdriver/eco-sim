@@ -1,7 +1,7 @@
 // Plant Leaf System
 // Handles plant leaf photosynthesis and energy distribution
 
-const PlantLeafSystem = {
+window.PlantLeafSystem = {
     // Reference to parent plant system
     plant: null,
     
