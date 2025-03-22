@@ -6,7 +6,7 @@ const CoreSimulation = {
     width: 400,
     height: 300,
     pixelSize: 1,
-    size: 0, // Will be calculated as width * height
+    size: 120000, // width * height
 
     // Type and state enums (will be populated by controller)
     TYPE: null,
@@ -21,22 +21,94 @@ const CoreSimulation = {
     metadata: null, // Additional data for complex behaviors
     cloud: null,    // Cloud data (0-255 for density)
 
+    // Cache for soil line heights
+    soilLineHeights: null,
+    soilLineLastUpdated: 0,
+    soilLineUpdateFrequency: 60, // Increased from default to reduce updates
+    soilLineCache: new Map(), // Cache for soil line calculations
+    
     // Initialize core systems
-    init: function() {
+    init: function(canvasWidth, canvasHeight) {
         console.log("Initializing core simulation data structures...");
 
-        // Calculate total size
-        this.size = this.width * this.height;
+        // If canvas dimensions are provided, adjust the grid size to match the aspect ratio
+        if (canvasWidth && canvasHeight) {
+            console.log(`Adjusting grid dimensions based on canvas size: ${canvasWidth}x${canvasHeight}`);
+            // Maintain a reasonable pixel count for performance
+            const targetPixelCount = 120000; // Our target size
+            
+            // Calculate dimensions that match canvas aspect ratio
+            const aspectRatio = canvasWidth / canvasHeight;
+            this.height = Math.floor(Math.sqrt(targetPixelCount / aspectRatio));
+            this.width = Math.floor(this.height * aspectRatio);
+            
+            // Safety check - ensure reasonable minimum dimensions
+            this.width = Math.max(200, this.width);
+            this.height = Math.max(150, this.height);
+            
+            // Update the size
+            this.size = this.width * this.height;
+            
+            console.log(`Adjusted grid dimensions to: ${this.width}x${this.height} (total: ${this.size} pixels)`);
+        } else {
+            console.log(`Using default grid dimensions: ${this.width}x${this.height}`);
+        }
 
-        // Create typed arrays for performance
+        // Initialize TYPE and STATE enums if not already set
+        if (!this.TYPE) {
+            this.TYPE = {
+                AIR: 0,
+                WATER: 1,
+                SOIL: 2,
+                PLANT: 3,
+                INSECT: 4,
+                SEED: 5,
+                DEAD_MATTER: 6,
+                WORM: 7
+            };
+        }
+
+        if (!this.STATE) {
+            this.STATE = {
+                DEFAULT: 0,
+                WET: 1,
+                DRY: 2,
+                FERTILE: 3,
+                ROOT: 4,
+                STEM: 5,
+                LEAF: 6,
+                FLOWER: 7,
+                LARVA: 8,
+                ADULT: 9,
+                DECOMPOSING: 10,
+                CLAY: 11,     // Clay soil type (poor drainage)
+                SANDY: 12,    // Sandy soil type (good drainage)
+                LOAMY: 13,    // Loamy soil type (balanced retention and drainage)
+                ROCKY: 14     // Rocky soil type (excellent drainage, poor retention)
+            };
+        }
+
+        // Initialize arrays
         this.type = new Uint8Array(this.size);
         this.state = new Uint8Array(this.size);
         this.water = new Uint8Array(this.size);
         this.nutrient = new Uint8Array(this.size);
         this.energy = new Uint8Array(this.size);
-        this.metadata = new Uint8Array(this.size);
         this.cloud = new Uint8Array(this.size);
-
+        this.metadata = new Uint8Array(this.size);
+        this.soilLineHeights = new Int16Array(this.width);
+        this.soilLineCache = new Map();
+        
+        // Initialize all pixels to air
+        this.type.fill(this.TYPE.AIR);
+        
+        // Initialize other arrays to 0
+        this.nutrient.fill(0);
+        this.energy.fill(0);
+        this.water.fill(0);
+        this.state.fill(this.STATE.DEFAULT);
+        this.metadata.fill(0);
+        
         return this;
     },
 
@@ -137,6 +209,96 @@ const CoreSimulation = {
 
         return neighbors;
     },
+    
+    // Get soil height for a specific x coordinate
+    getSoilHeight: function(x, frameCount) {
+        // Check cache first
+        if (this.soilLineCache.has(x)) {
+            const cached = this.soilLineCache.get(x);
+            if (frameCount - cached.frame < this.soilLineUpdateFrequency) {
+                return cached.height;
+            }
+        }
+
+        // If not in cache or cache expired, calculate
+        const height = this.calculateSoilHeight(x);
+        
+        // Update cache
+        this.soilLineCache.set(x, {
+            height: height,
+            frame: frameCount
+        });
+
+        return height;
+    },
+
+    // Calculate soil height for a specific x coordinate
+    calculateSoilHeight: function(x) {
+        // Start from the top and go down
+        for (let y = 0; y < this.height; y++) {
+            const index = this.getIndex(x, y);
+            if (index !== -1 && this.type[index] === this.TYPE.SOIL) {
+                return y;
+            }
+        }
+        
+        // If no soil found, use default value
+        return this.getDefaultSoilHeight();
+    },
+
+    // Update soil line heights
+    updateSoilLineHeights: function(frameCount) {
+        // Only update periodically to save performance
+        if (frameCount - this.soilLineLastUpdated < this.soilLineUpdateFrequency && this.soilLineLastUpdated > 0) {
+            return this.soilLineHeights;
+        }
+        
+        // Reset heights
+        for (let x = 0; x < this.width; x++) {
+            this.soilLineHeights[x] = -1;
+        }
+        
+        // For each column, find the topmost soil pixel
+        for (let x = 0; x < this.width; x++) {
+            this.soilLineHeights[x] = this.calculateSoilHeight(x);
+        }
+        
+        // Smooth the soil line to prevent sharp spikes
+        this.smoothSoilLine();
+        
+        // Update the last update frame
+        this.soilLineLastUpdated = frameCount;
+        
+        return this.soilLineHeights;
+    },
+    
+    // Smooth the soil line to prevent sharp edges
+    smoothSoilLine: function() {
+        const tempHeights = new Int16Array(this.soilLineHeights);
+        
+        // Apply a simple smoothing algorithm
+        for (let x = 1; x < this.width - 1; x++) {
+            // If the current column is too different from its neighbors, smooth it
+            const left = this.soilLineHeights[x - 1];
+            const right = this.soilLineHeights[x + 1];
+            const current = this.soilLineHeights[x];
+            
+            // Only smooth if the difference is too large
+            if (Math.abs(current - left) > 3 || Math.abs(current - right) > 3) {
+                tempHeights[x] = Math.floor((left + right + current) / 3);
+            }
+        }
+        
+        // Copy back the smoothed values
+        for (let x = 1; x < this.width - 1; x++) {
+            this.soilLineHeights[x] = tempHeights[x];
+        }
+    },
+    
+    // Get the default soil height (the previous hard-coded value)
+    getDefaultSoilHeight: function() {
+        return Math.floor(this.height * 0.6);
+    },
 
     // Swap two pixels (swap all properties)
     swapPixels: function(index1, index2) {
@@ -222,11 +384,6 @@ const CoreSimulation = {
         return count;
     }
 };
-
-// Make CoreSimulation available for testing in Node.js environment
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = CoreSimulation;
-}
 
 // Make CoreSimulation available for testing in Node.js environment
 if (typeof module !== 'undefined' && module.exports) {

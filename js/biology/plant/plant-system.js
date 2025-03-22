@@ -94,6 +94,9 @@ window.PlantSystem = {
     // Store species/variant information for each plant group
     plantSpeciesMap: {},           // Map of plant group IDs to species indices
 
+    // Track current frame count for soil line calculations
+    frameCount: 0,
+
     // Initialize plant system
     init: function(biologySystem) {
         this.biology = biologySystem;
@@ -128,8 +131,16 @@ window.PlantSystem = {
         checkedThisFrame: null    // Track which pixels we've already checked
     },
     
+    // Get soil height at a specific x coordinate using the actual soil line
+    getSoilHeight: function(x) {
+        return this.core.getSoilHeight(x, this.frameCount);
+    },
+
     // Update all plant pixels
     update: function(activePixels, nextActivePixels) {
+        // Increment frame count for soil line calculations
+        this.frameCount++;
+        
         // Reset plant metrics for this frame
         this.plantMetrics.stemHeight = 0;
         this.plantMetrics.leafCount = 0;
@@ -209,7 +220,7 @@ window.PlantSystem = {
                 if (state === this.STATE.STEM) {
                     stemCount++;
                     // Track how high stems reach from ground level
-                    const groundLevel = Math.floor(this.core.height * 0.6);
+                    const groundLevel = this.getSoilHeight(coords.x);
                     const heightFromGround = groundLevel - coords.y;
                     if (heightFromGround > maxStemHeight) {
                         maxStemHeight = heightFromGround;
@@ -253,15 +264,15 @@ window.PlantSystem = {
     // Update a single plant pixel
     // Find all roots connected to the ground
     findGroundConnectedRoots: function(activePixels) {
-        // Calculate ground level
-        const groundLevel = Math.floor(this.core.height * 0.6);
-        
-        // First find all roots at or below ground level
+        // Loop through all roots
         activePixels.forEach(index => {
             if (this.core.type[index] === this.TYPE.PLANT && 
                 this.core.state[index] === this.STATE.ROOT) {
                 
                 const coords = this.core.getCoords(index);
+                
+                // Get the actual soil height at this x coordinate
+                const groundLevel = this.getSoilHeight(coords.x);
                 
                 // Check if root is at or below ground level
                 if (coords.y >= groundLevel) {
@@ -278,7 +289,6 @@ window.PlantSystem = {
                     
                     // Only count as grounded if touching soil
                     if (touchingSoil) {
-                        // Mark as connected to ground
                         this.plantConnectivity.connectedToGround[index] = 1;
                         this.plantConnectivity.rootIndices.push(index);
                     }
@@ -450,13 +460,16 @@ window.PlantSystem = {
         
         // Count stems near roots to calculate trunk thickness
         let trunkThickness = 1;
-        const groundLevel = Math.floor(this.core.height * 0.6);
         let nearGroundStems = 0;
         
         // Count stems near the ground level to determine trunk thickness
         for (const index of connectedIndices) {
             if (this.core.state[index] === this.STATE.STEM) {
                 const coords = this.core.getCoords(index);
+                
+                // Get actual soil height at this position
+                const groundLevel = this.getSoilHeight(coords.x);
+                
                 // Check if stem is near ground (first 5 rows above ground)
                 if (coords.y >= groundLevel - 5 && coords.y < groundLevel) {
                     nearGroundStems++;
@@ -480,7 +493,7 @@ window.PlantSystem = {
             // Different plant parts need different levels of support
             if (state === this.STATE.STEM) {
                 // Stems need good support, especially higher up
-                const heightFromGround = groundLevel - coords.y; // Higher = more height
+                const heightFromGround = this.getSoilHeight(coords.x) - coords.y; // Higher = more height
                 
                 // Higher stems need more support
                 const neighbors = this.core.getNeighborIndices(coords.x, coords.y);
@@ -756,6 +769,113 @@ window.PlantSystem = {
                 this.core.water[index] = 5 + Math.random() * 10; // Small water boost from humidity
             }
         }
+    },
+
+    // Adding a new function for creating a new plant
+    createNewPlant: function(x, y, index, parentIndex = null) {
+        // Create a new plant group ID
+        const plantGroupId = this.nextPlantGroupId++;
+        this.plantGroups[index] = plantGroupId;
+        this.plantOrigins[plantGroupId] = {x: x, y: y};
+        
+        // Track plant age
+        this.plantAges[index] = 1;
+        
+        // If this plant was created from a parent plant (via reproduction)
+        if (parentIndex !== null) {
+            // Get parent's plant group
+            const parentGroupId = this.getPlantGroupId(parentIndex);
+            
+            // Register reproduction with evolution system
+            this.biology.handleReproduction(parentIndex, index);
+            
+            // Use parent's species if available, otherwise random
+            if (parentGroupId && this.plantSpeciesMap[parentGroupId] !== undefined) {
+                this.plantSpeciesMap[plantGroupId] = this.plantSpeciesMap[parentGroupId];
+            } else {
+                this.plantSpeciesMap[plantGroupId] = Math.floor(Math.random() * this.plantSpecies.length);
+            }
+        } else {
+            // Assign a random species for new plants without parents
+            this.plantSpeciesMap[plantGroupId] = Math.floor(Math.random() * this.plantSpecies.length);
+        }
+        
+        return plantGroupId;
+    },
+    
+    // Get growth rate multiplier for a plant part
+    getGrowthRateMultiplier: function(index) {
+        // Get base value from biology system
+        const baseGrowthRate = this.biology.growthRate;
+        
+        // Apply genetic trait if evolution system is available
+        const geneticModifier = this.biology.getTraitModifier(index, "growthRate");
+        
+        // Apply species-specific growth rate
+        const plantGroupId = this.getPlantGroupId(index);
+        let speciesModifier = 1.0;
+        
+        if (plantGroupId && this.plantSpeciesMap[plantGroupId] !== undefined) {
+            const speciesIndex = this.plantSpeciesMap[plantGroupId];
+            speciesModifier = this.plantSpecies[speciesIndex].growthRate;
+        }
+        
+        // Combined growth modifier
+        return baseGrowthRate * geneticModifier * speciesModifier;
+    },
+    
+    // Get water efficiency multiplier
+    getWaterEfficiencyMultiplier: function(index) {
+        return this.biology.getTraitModifier(index, "waterEfficiency");
+    },
+    
+    // Get nutrient efficiency multiplier
+    getNutrientEfficiencyMultiplier: function(index) {
+        return this.biology.getTraitModifier(index, "nutrientEfficiency");
+    },
+    
+    // Get stem strength multiplier
+    getStemStrengthMultiplier: function(index) {
+        return this.biology.getTraitModifier(index, "stemStrength");
+    },
+    
+    // Get root depth multiplier
+    getRootDepthMultiplier: function(index) {
+        return this.biology.getTraitModifier(index, "rootDepth");
+    },
+    
+    // Get leaf size multiplier
+    getLeafSizeMultiplier: function(index) {
+        const baseMultiplier = this.biology.getTraitModifier(index, "leafSize");
+        
+        // Apply species-specific leaf size
+        const plantGroupId = this.getPlantGroupId(index);
+        if (plantGroupId && this.plantSpeciesMap[plantGroupId] !== undefined) {
+            const speciesIndex = this.plantSpeciesMap[plantGroupId];
+            return baseMultiplier * this.plantSpecies[speciesIndex].leafSize;
+        }
+        
+        return baseMultiplier;
+    },
+    
+    // Get drought resistance multiplier
+    getDroughtResistanceMultiplier: function(index) {
+        return this.biology.getTraitModifier(index, "droughtResistance");
+    },
+    
+    // Get seed production rate multiplier
+    getSeedProductionMultiplier: function(index) {
+        return this.biology.getTraitModifier(index, "seedProduction");
+    },
+    
+    // Get fire resistance multiplier
+    getFireResistanceMultiplier: function(index) {
+        return this.biology.getTraitModifier(index, "fireResistance");
+    },
+    
+    // Get plant group ID for a plant part
+    getPlantGroupId: function(index) {
+        return this.plantGroups[index];
     }
 };
 

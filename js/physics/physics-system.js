@@ -103,17 +103,21 @@ const PhysicsSystem = {
             
             // Periodic full-grid gravity check (every 30 frames)
             if (Math.random() < 0.03) {
-                for (let i = 0; i < this.core.size; i++) {
-                    if (gravityAffectedTypes.includes(this.core.type[i]) && !activePixels.has(i)) {
-                        // Check if there's air or water below this pixel
-                        const coords = this.core.getCoords(i);
-                        const belowIndex = this.core.getIndex(coords.x, coords.y + 1);
-                        
-                        if (belowIndex !== -1 && 
-                            (this.core.type[belowIndex] === this.TYPE.AIR || 
-                             this.core.type[belowIndex] === this.TYPE.WATER)) {
-                            // This pixel should be falling but isn't active
-                            gravityPixels.add(i);
+                // Only scan the top portion of the grid where falling objects are likely to be
+                const scanHeight = Math.floor(this.core.height * 0.3); // Only scan top 30% of grid
+                for (let y = 0; y < scanHeight; y++) {
+                    for (let x = 0; x < this.core.width; x++) {
+                        const index = this.core.getIndex(x, y);
+                        if (index !== -1 && gravityAffectedTypes.includes(this.core.type[index]) && !activePixels.has(index)) {
+                            // Check if there's air or water below this pixel
+                            const belowIndex = this.core.getIndex(x, y + 1);
+                            
+                            if (belowIndex !== -1 && 
+                                (this.core.type[belowIndex] === this.TYPE.AIR || 
+                                 this.core.type[belowIndex] === this.TYPE.WATER)) {
+                                // This pixel should be falling but isn't active
+                                gravityPixels.add(index);
+                            }
                         }
                     }
                 }

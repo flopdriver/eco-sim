@@ -55,12 +55,17 @@ const InsectSystem = {
             };
         }
 
-        // Significant energy consumption each tick
-        this.core.energy[index] -= 1 * this.biology.metabolism;
+        // Apply metabolism trait to energy consumption
+        const metabolismMultiplier = this.getMetabolismMultiplier(index);
+        this.core.energy[index] -= 1.2 * metabolismMultiplier;
 
+        // Apply lifespan trait to starvation counter
+        const lifespanMultiplier = this.getLifespanMultiplier(index);
+        
         // If couldn't eat in previous ticks, increase starvation counter
         if (this.core.energy[index] < 300) {
-            this.core.metadata[index].starvationCounter++; // Increment starvation counter
+            // Insects with higher lifespan trait have slower starvation
+            this.core.metadata[index].starvationCounter += 1.2 / lifespanMultiplier;
         } else {
             // Reset starvation counter if well-fed
             this.core.metadata[index].starvationCounter = 0;
@@ -101,7 +106,7 @@ const InsectSystem = {
             this.moveInsect(x, y, index, nextActivePixels, true);
         } else {
             // Enough energy, consider reproduction
-            if (this.core.energy[index] > 200 && Math.random() < 0.002 * this.biology.reproduction) {
+            if (this.core.energy[index] > 250 && Math.random() < 0.001 * this.biology.reproduction) {
                 this.reproduceInsect(x, y, index, nextActivePixels);
             } else {
                 // Otherwise just move randomly
@@ -122,8 +127,9 @@ const InsectSystem = {
             // Choose a random plant neighbor
             const neighbor = plantNeighbors[Math.floor(Math.random() * plantNeighbors.length)];
 
-            // More aggressive energy gain
-            const energyGain = 10 + Math.floor(this.core.energy[neighbor.index] / 1.2);
+            // Apply feeding efficiency to energy gain
+            const feedingEfficiency = this.getFeedingEfficiencyMultiplier(index);
+            const energyGain = (10 + Math.floor(this.core.energy[neighbor.index] / 1.2)) * feedingEfficiency;
             this.core.energy[index] += energyGain;
 
             // Cap energy
@@ -131,6 +137,9 @@ const InsectSystem = {
                 this.core.energy[index] = 200;
             }
 
+            // Apply strength trait to plant damage
+            const strength = this.getStrengthMultiplier(index);
+            
             // Very destructive plant consumption
             switch (this.core.state[neighbor.index]) {
                 case this.STATE.LEAF:
@@ -159,111 +168,110 @@ const InsectSystem = {
 
     // Move insect to a new position
     moveInsect: function(x, y, index, nextActivePixels, seekingFood) {
-        let possibleMoves = [];
-
-        // Get all possible moves (into air, water, or plants)
-        const neighbors = this.core.getNeighborIndices(x, y);
-
-        for (const neighbor of neighbors) {
-            // Can move into air, plants (flying over), and occasionally into water (if desperate)
-            if (this.core.type[neighbor.index] === this.TYPE.AIR || 
-                this.core.type[neighbor.index] === this.TYPE.PLANT ||
-                (this.core.type[neighbor.index] === this.TYPE.WATER && 
-                 (this.core.energy[index] < 50 || Math.random() < 0.2))) {
-                possibleMoves.push(neighbor);
-            }
+        // Get speed multiplier from genetic traits
+        const speedMultiplier = this.getSpeedMultiplier(index);
+        
+        // Adjust movement probability based on speed trait
+        // Faster insects move more frequently
+        const movementProbability = 0.9 * speedMultiplier;
+        
+        if (Math.random() > movementProbability) {
+            // Insect stays in place this frame
+            nextActivePixels.add(index);
+            return false;
         }
-
-        // If seeking food, check if any moves are toward plants
-        if (seekingFood && possibleMoves.length > 0) {
-            // Look for plants within detection range
-            const plantDirections = this.findDirectionToPlant(x, y, 5);
-
-            if (plantDirections.length > 0) {
-                // Filter moves that are in the direction of plants
-                const plantDirectionMoves = possibleMoves.filter(move => {
-                    const dx = move.x - x;
-                    const dy = move.y - y;
-
-                    // Check if this move is in any of the plant directions
-                    return plantDirections.some(dir => {
-                        return (dx * dir.dx + dy * dir.dy) > 0; // Dot product > 0 means same general direction
-                    });
-                });
-
-                // If we have any moves toward plants, use those instead
-                if (plantDirectionMoves.length > 0) {
-                    possibleMoves = plantDirectionMoves;
+        
+        // Check neighboring cells
+        const neighbors = this.core.getNeighborIndices(x, y);
+        let validMoves = [];
+        
+        // If seeking food, prioritize cells near plants
+        if (seekingFood) {
+            // First priority: Check if any neighbors are plants
+            const plantNeighbors = this.core.getNeighborIndices(x, y, 2); // 2-cell radius
+            
+            // Find air cells that are near plants
+            for (const neighbor of neighbors) {
+                if (this.core.type[neighbor.index] === this.TYPE.AIR) {
+                    // Check if this air cell is near a plant
+                    let nearPlant = false;
+                    for (const extendedNeighbor of plantNeighbors) {
+                        if (this.core.type[extendedNeighbor.index] === this.TYPE.PLANT) {
+                            // Calculate distance from this air cell to the plant
+                            const dx = extendedNeighbor.x - neighbor.x;
+                            const dy = extendedNeighbor.y - neighbor.y;
+                            const distance = Math.sqrt(dx*dx + dy*dy);
+                            
+                            if (distance < 3) {
+                                nearPlant = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // If this air cell is near a plant, heavily prioritize it
+                    if (nearPlant) {
+                        // Add multiple times to increase probability
+                        for (let i = 0; i < 5; i++) {
+                            validMoves.push(neighbor);
+                        }
+                    } else {
+                        validMoves.push(neighbor);
+                    }
                 }
             }
+        } else {
+            // Not seeking food, just find any valid move
+            validMoves = neighbors.filter(n => this.core.type[n.index] === this.TYPE.AIR);
         }
-
-        // If we have possible moves, choose one randomly
-        if (possibleMoves.length > 0) {
-            const move = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-
-            // Store the destination plant information if moving into a plant
-            const isMovingIntoPlant = this.core.type[move.index] === this.TYPE.PLANT;
-            const plantState = isMovingIntoPlant ? this.core.state[move.index] : null;
-            const plantEnergy = isMovingIntoPlant ? this.core.energy[move.index] : 0;
-            const plantWater = isMovingIntoPlant ? this.core.water[move.index] : 0;
+        
+        // Add current position to valid moves (lower probability to stay in place)
+        if (Math.random() < 0.3) {
+            validMoves.push({x: x, y: y, index: index});
+        }
+        
+        if (validMoves.length > 0) {
+            // Choose a random valid move
+            const move = validMoves[Math.floor(Math.random() * validMoves.length)];
             
-            // Check if insect is currently on a plant and needs to restore it when moving
-            const wasOnPlant = this.core.metadata[index] && 
-                              this.core.metadata[index].onPlant;
+            // Don't actually move if we selected current position
+            if (move.index === index) {
+                nextActivePixels.add(index);
+                return false;
+            }
             
-            // Move insect
+            // Update pixel type and state
             this.core.type[move.index] = this.TYPE.INSECT;
             this.core.state[move.index] = this.core.state[index];
             this.core.energy[move.index] = this.core.energy[index];
-
-            // Clear original position or restore plant
-            if (wasOnPlant) {
-                // Restore the plant
-                this.core.type[index] = this.TYPE.PLANT;
-                this.core.state[index] = this.core.metadata[index].plantState;
-                this.core.energy[index] = this.core.metadata[index].plantEnergy;
-                if (this.core.metadata[index].plantWater) {
-                    this.core.water[index] = this.core.metadata[index].plantWater;
-                }
-            } else {
-                // No plant to restore
-                this.core.type[index] = this.TYPE.AIR;
-                this.core.state[index] = this.STATE.DEFAULT;
-                this.core.energy[index] = 0;
-            }
+            this.core.water[move.index] = this.core.water[index];
+            this.core.metadata[move.index] = this.core.metadata[index];
             
-            // Transfer metadata to new position
-            if (!this.core.metadata[move.index]) {
-                this.core.metadata[move.index] = {};
-            }
+            // Clear old position
+            this.core.type[index] = this.TYPE.AIR;
+            this.core.state[index] = 0;
+            this.core.metadata[index] = 0;
             
-            // If insect has starvation counter, keep it
-            if (this.core.metadata[index] && this.core.metadata[index].starvationCounter !== undefined) {
-                this.core.metadata[move.index].starvationCounter = this.core.metadata[index].starvationCounter;
-            } else {
-                this.core.metadata[move.index].starvationCounter = 0;
-            }
-            
-            // Store plant info in the insect's metadata if moving into a plant
-            if (isMovingIntoPlant) {
-                this.core.metadata[move.index].onPlant = true;
-                this.core.metadata[move.index].plantState = plantState;
-                this.core.metadata[move.index].plantEnergy = plantEnergy;
-                this.core.metadata[move.index].plantWater = plantWater;
-            } else {
-                // Clear plant status if moving to air or water
-                this.core.metadata[move.index].onPlant = false;
-            }
-
-            // Mark new position as processed
-            this.biology.processedThisFrame[move.index] = 1;
+            // Mark new position as active and processed
             nextActivePixels.add(move.index);
-
+            this.biology.processedThisFrame[move.index] = 1;
+            
+            // If the evolution system is tracking this insect, update its position
+            if (this.biology.evolutionSystem) {
+                const genomeId = this.biology.evolutionSystem.organismGenomes[index];
+                if (genomeId) {
+                    // Transfer genome tracking to new index
+                    delete this.biology.evolutionSystem.organismGenomes[index];
+                    this.biology.evolutionSystem.organismGenomes[move.index] = genomeId;
+                }
+            }
+            
             return true;
+        } else {
+            // No valid moves, stay in place
+            nextActivePixels.add(index);
+            return false;
         }
-
-        return false;
     },
 
     // Find direction(s) to nearby plants
@@ -303,29 +311,72 @@ const InsectSystem = {
 
     // Reproduce insect
     reproduceInsect: function(x, y, index, nextActivePixels) {
-        // Check for air pixels where offspring can be placed
-        const neighbors = this.core.getNeighborIndices(x, y);
-        const airNeighbors = neighbors.filter(n => this.core.type[n.index] === this.TYPE.AIR);
-
-        if (airNeighbors.length > 0) {
-            // Choose a random air neighbor
-            const neighbor = airNeighbors[Math.floor(Math.random() * airNeighbors.length)];
-
-            // Create new insect
-            this.core.type[neighbor.index] = this.TYPE.INSECT;
-            this.core.state[neighbor.index] = this.STATE.ADULT;
-
-            // Share energy with offspring
-            this.core.energy[neighbor.index] = this.core.energy[index] / 2;
-            this.core.energy[index] = this.core.energy[index] / 2;
-
-            // Mark as processed and active
-            this.biology.processedThisFrame[neighbor.index] = 1;
-            nextActivePixels.add(neighbor.index);
-
-            return true;
+        // Get reproduction rate trait
+        const reproductionRate = this.getReproductionRateMultiplier(index);
+        
+        // Base reproduction chance adjusted by trait
+        if (Math.random() < 0.5 * reproductionRate) {
+            // Find adjacent air to spawn new insect
+            const neighbors = this.core.getNeighborIndices(x, y);
+            const airNeighbors = neighbors.filter(n => this.core.type[n.index] === this.TYPE.AIR);
+            
+            if (airNeighbors.length > 0) {
+                // Choose random air neighbor
+                const neighbor = airNeighbors[Math.floor(Math.random() * airNeighbors.length)];
+                
+                // Create new insect
+                this.core.type[neighbor.index] = this.TYPE.INSECT;
+                this.core.energy[neighbor.index] = 100;
+                this.core.water[neighbor.index] = 10;
+                this.core.metadata[neighbor.index] = {
+                    starvationCounter: 0,
+                    onPlant: false
+                };
+                
+                // Register reproduction with evolution system
+                this.biology.handleReproduction(index, neighbor.index);
+                
+                nextActivePixels.add(neighbor.index);
+                
+                // Parent loses energy from reproduction
+                this.core.energy[index] -= 20;
+            }
         }
+    },
 
-        return false;
-    }
+    // Get speed multiplier for insect
+    getSpeedMultiplier: function(index) {
+        return this.biology.getTraitModifier(index, "speed");
+    },
+    
+    // Get metabolism multiplier for insect
+    getMetabolismMultiplier: function(index) {
+        // Combine base metabolism with genetic trait
+        const baseMetabolism = this.biology.metabolism;
+        const geneticModifier = this.biology.getTraitModifier(index, "metabolism");
+        return baseMetabolism * geneticModifier;
+    },
+    
+    // Get feeding efficiency multiplier for insect
+    getFeedingEfficiencyMultiplier: function(index) {
+        return this.biology.getTraitModifier(index, "feedingEfficiency");
+    },
+    
+    // Get reproduction rate multiplier for insect
+    getReproductionRateMultiplier: function(index) {
+        // Combine base reproduction rate with genetic trait
+        const baseReproductionRate = this.biology.reproduction;
+        const geneticModifier = this.biology.getTraitModifier(index, "reproductionRate");
+        return baseReproductionRate * geneticModifier;
+    },
+    
+    // Get strength multiplier for insect
+    getStrengthMultiplier: function(index) {
+        return this.biology.getTraitModifier(index, "strength");
+    },
+    
+    // Get lifespan multiplier for insect
+    getLifespanMultiplier: function(index) {
+        return this.biology.getTraitModifier(index, "lifespan");
+    },
 }

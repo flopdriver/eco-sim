@@ -9,6 +9,9 @@ const SoilMoistureSystem = {
     soilTypeAffectsWaterMovement: true,
     wormTunnelsAffectDrainage: true,
     
+    // Current frame count for timing operations
+    frameCount: 0,
+    
     // Drainage rates for different soil types (higher = faster water movement)
     soilDrainageRates: {
         DEFAULT: 1.0,    // Standard soil
@@ -56,8 +59,8 @@ const SoilMoistureSystem = {
 
     // Determine soil layer type based on position and depth
     determineSoilLayer: function(x, y) {
-        // Calculate ground level and depth
-        const groundLevel = Math.floor(this.physics.core.height * 0.6);
+        // Calculate ground level and depth using actual soil line
+        const groundLevel = this.physics.core.getSoilHeight(x, this.frameCount);
         const depthFromSurface = y - groundLevel;
         
         // Get appropriate probability distribution based on depth
@@ -140,6 +143,9 @@ const SoilMoistureSystem = {
 
     // Update soil moisture movement
     updateSoilMoisture: function(activePixels, nextActivePixels) {
+        // Update frame count
+        this.frameCount++;
+        
         // Process only wet soil pixels
         activePixels.forEach(index => {
             if (this.physics.core.type[index] === this.physics.TYPE.SOIL &&

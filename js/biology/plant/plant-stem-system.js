@@ -212,7 +212,7 @@ window.PlantStemSystem = {
         ];
         
         // Get ground level and plant height for reference
-        const groundLevel = Math.floor(this.plant.core.height * 0.6);
+        const groundLevel = this.getSoilHeight(x);
         const plantHeight = this.plant.plantMetrics.stemHeight;
         
         // Check if connected to other plant parts - stems should not grow in isolation
@@ -635,5 +635,10 @@ window.PlantStemSystem = {
             
             nextActivePixels.add(newIndex);
         }
+    },
+
+    // Get soil height at a specific x coordinate using the parent plant system's method
+    getSoilHeight: function(x) {
+        return this.plant.getSoilHeight(x);
     }
 };

@@ -52,13 +52,19 @@ const WormSystem = {
         }
 
         // Worms consume energy each tick
-        this.core.energy[index] -= 0.3 * this.biology.metabolism;
+        this.core.energy[index] -= 0.4 * this.biology.metabolism;
 
         // Try to find and eat dead matter
         if (this.core.energy[index] < 100) {
             if (this.tryEatDeadMatter(x, y, index, nextActivePixels)) {
                 return; // If successfully ate, don't do other actions
             }
+        }
+
+        // Attempt reproduction if energy is high
+        if (this.core.energy[index] > 150 && Math.random() < 0.003 * this.biology.reproduction) {
+            this.reproduceWorm(x, y, index, nextActivePixels);
+            return; // Don't move after reproducing
         }
 
         // Only allow worms to move in soil and below ground level
@@ -233,6 +239,35 @@ const WormSystem = {
             }
         }
 
+        return false;
+    },
+
+    // New method for worm reproduction
+    reproduceWorm: function(x, y, index, nextActivePixels) {
+        const neighbors = this.core.getNeighborIndices(x, y);
+        const soilNeighbors = neighbors.filter(n => 
+            this.core.type[n.index] === this.TYPE.SOIL && 
+            this.core.state[n.index] !== this.STATE.ROCKY // Avoid rocky soil for reproduction
+        );
+
+        if (soilNeighbors.length > 0) {
+            // Choose a random soil neighbor
+            const neighbor = soilNeighbors[Math.floor(Math.random() * soilNeighbors.length)];
+            
+            // Create a new worm
+            this.core.type[neighbor.index] = this.TYPE.WORM;
+            this.core.state[neighbor.index] = this.STATE.DEFAULT;
+            this.core.energy[neighbor.index] = 100;
+            
+            // Parent worm loses energy from reproduction
+            this.core.energy[index] -= 70;
+            
+            // Handle genetics
+            this.biology.handleReproduction(index, neighbor.index);
+            
+            nextActivePixels.add(neighbor.index);
+            return true;
+        }
         return false;
     }
 };

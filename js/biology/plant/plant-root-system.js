@@ -228,7 +228,7 @@ window.PlantRootSystem = {
         const environmentFactors = this.assessRootEnvironment(x, y);
 
         // Calculate distance from plant origin for growth decisions
-        const groundLevel = Math.floor(this.plant.core.height * 0.6);
+        const groundLevel = this.getSoilHeight(x);
         const depthFromSurface = y - groundLevel; // How far below ground
         const maxDesiredRootDepth = Math.min(this.rootPatterns.maxRootDepth,
             Math.max(400, this.plant.plantMetrics.stemHeight * 6.0)); // Roots much deeper than stem height
@@ -421,7 +421,7 @@ window.PlantRootSystem = {
         const dy = 1; // Always downward
 
         // Calculate groundLevel and depth for depth-based behavior
-        const groundLevel = Math.floor(this.plant.core.height * 0.6);
+        const groundLevel = this.getSoilHeight(x);
         const depthFromSurface = y - groundLevel;
         const maxDepth = this.rootPatterns.maxRootDepth;
         const depthRatio = depthFromSurface / maxDepth;
@@ -490,7 +490,7 @@ window.PlantRootSystem = {
         // Mature plants have more complex branching patterns
 
         // Get plant maturity and root zone info
-        const groundLevel = Math.floor(this.plant.core.height * 0.6);
+        const groundLevel = this.getSoilHeight(x);
         const depthFromSurface = y - groundLevel;
         const stemHeight = this.plant.plantMetrics.stemHeight;
         const plantMaturity = stemHeight / this.rootPatterns.maturityThreshold;
@@ -738,7 +738,7 @@ window.PlantRootSystem = {
         const upIndex = this.plant.core.getIndex(x, y - 1);
 
         // Calculate ground level for reference
-        const groundLevel = Math.floor(this.plant.core.height * 0.6);
+        const groundLevel = this.getSoilHeight(x);
 
         // Check if the root is near the surface (within 10 pixels of ground level)
         const isNearSurface = y <= groundLevel + 10;
@@ -997,5 +997,10 @@ window.PlantRootSystem = {
                 }
             }
         }
+    },
+
+    // Get soil height at a specific x coordinate using the parent plant system's method
+    getSoilHeight: function(x) {
+        return this.plant.getSoilHeight(x);
     }
 };

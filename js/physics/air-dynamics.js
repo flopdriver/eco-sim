@@ -11,6 +11,9 @@ const AirDynamicsSystem = {
     turbulenceIntensity: 0.3, // 0-1 range, controls randomness of air movement
     airFlowRate: 2.5,     // Global multiplier for air movement speed
 
+    // Current frame count for timing operations
+    frameCount: 0,
+
     // Initialize air dynamics system
     init: function(physicsSystem) {
         this.physics = physicsSystem;
@@ -51,6 +54,9 @@ const AirDynamicsSystem = {
 
     // Update air movement
     updateAirDynamics: function(activePixels, nextActivePixels) {
+        // Increment frame count
+        this.frameCount++;
+        
         // Periodically randomize wind (every ~100 ticks on average)
         if (Math.random() < 0.01) {
             this.randomizeWindParameters();
@@ -59,12 +65,12 @@ const AirDynamicsSystem = {
         // Collect air pixels, prioritizing those above ground
         const airPixels = [];
 
-        // Calculate ground level
-        const groundLevel = Math.floor(this.physics.core.height * 0.6);
-
         activePixels.forEach(index => {
             if (this.physics.core.type[index] === this.physics.TYPE.AIR) {
                 const coords = this.physics.core.getCoords(index);
+                
+                // Get the actual ground level at this x position
+                const groundLevel = this.getSoilHeight(coords.x);
 
                 // Only process air pixels that are above ground level
                 // This prevents air bubble creation below the soil line
@@ -86,8 +92,8 @@ const AirDynamicsSystem = {
 
     // Update a single air pixel with wind and turbulence
     updateSingleAirPixel: function(x, y, index, nextActivePixels) {
-        // Calculate ground level
-        const groundLevel = Math.floor(this.physics.core.height * 0.6);
+        // Get the actual ground level at this x position
+        const groundLevel = this.getSoilHeight(x);
 
         // Check if this air is below ground level (should never be the case now with our filter)
         const isBelowGround = y > groundLevel;
@@ -236,5 +242,10 @@ const AirDynamicsSystem = {
         const y = (Math.random() * maxTurbulence) - maxTurbulence / 2;
 
         return { x, y };
+    },
+
+    // Get soil height at a specific x coordinate
+    getSoilHeight: function(x) {
+        return this.physics.core.getSoilHeight(x, this.frameCount);
     }
 };

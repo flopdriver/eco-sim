@@ -22,6 +22,9 @@ const FluidDynamicsSystem = {
     MIN_TRANSFER_AMOUNT: 10,
     SHALLOW_SOIL_WATER_CAPACITY: 9999, // "Infinite" absorption for surface soil
 
+    // Current frame count for timing operations
+    frameCount: 0,
+
     // Initialize fluid dynamics system
     init: function(physicsSystem) {
         this.physics = physicsSystem;
@@ -31,35 +34,26 @@ const FluidDynamicsSystem = {
 
     // Main update function - processes active water pixels
     updateWaterMovement: function(activePixels, nextActivePixels) {
-        // Collect and sort water pixels (bottom to top to prevent cascading)
-        const waterPixels = this.collectWaterPixels(activePixels);
-
-        // Check if emergency drainage is needed
-        const emergencyDrainageNeeded = waterPixels.length > this.WATER_EMERGENCY_THRESHOLD;
-
-        if (emergencyDrainageNeeded) {
-            this.performEmergencyDrainage(waterPixels);
+        // Increment frame count for soil line calculations
+        this.frameCount++;
+        
+        // Emergency drainage if water count is too high
+        if (this.physics.core.countPixelsOfType(this.physics.TYPE.WATER) > this.WATER_EMERGENCY_THRESHOLD) {
+            this.emergencyWaterDrainage();
         }
 
-        // Sort water pixels by y-position (descending, bottom pixels first)
-        waterPixels.sort((a, b) => b.y - a.y);
-
-        // Process each water pixel
-        for (const pixel of waterPixels) {
-            // Skip if already processed this frame
-            if (this.physics.processedThisFrame[pixel.index]) continue;
-
-            this.physics.processedThisFrame[pixel.index] = 1;
-
-            // Handle emergency drainage
-            if (emergencyDrainageNeeded && Math.random() < 0.2) {
-                const groundLevel = this.getGroundLevel();
-                this.convertWaterByElevation(pixel.index, pixel.y, groundLevel);
-                continue;
+        // Process each active water pixel
+        activePixels.forEach(index => {
+            if (this.physics.core.type[index] === this.physics.TYPE.WATER) {
+                const coords = this.physics.core.getCoords(index);
+                
+                // Skip if already processed this frame
+                if (!this.physics.processedThisFrame[index]) {
+                    this.physics.processedThisFrame[index] = 1;
+                    this.updateSingleWaterPixel(coords.x, coords.y, index, nextActivePixels);
+                }
             }
-
-            this.updateSingleWaterPixel(pixel.x, pixel.y, pixel.index, nextActivePixels);
-        }
+        });
     },
 
     // Collect water pixels from active pixels
@@ -77,27 +71,25 @@ const FluidDynamicsSystem = {
     },
 
     // Handle emergency drainage to prevent flooding
-    performEmergencyDrainage: function(waterPixels) {
+    emergencyWaterDrainage: function() {
         console.log("Emergency water drainage activated - removing excess water");
-
-        // Identify ground level for drainage
-        const groundLevel = this.getGroundLevel();
-
-        // Find water pixels at ground level for removal
-        const groundWaterPixels = waterPixels.filter(p =>
-            p.y >= groundLevel - 3 && p.y <= groundLevel + 5
-        );
-
-        // Remove 40-50% of ground water
-        const removalCount = Math.ceil(groundWaterPixels.length * 0.4 + Math.random() * 0.1);
-        const toRemove = groundWaterPixels.slice(0, removalCount);
-
-        // Actually remove the water
-        toRemove.forEach(pixel => {
-            this.physics.core.type[pixel.index] = this.physics.TYPE.AIR;
-            this.physics.core.water[pixel.index] = 0;
-            this.physics.processedThisFrame[pixel.index] = 1;
-        });
+        
+        // Find and process all water pixels
+        for (let y = 0; y < this.physics.core.height; y++) {
+            for (let x = 0; x < this.physics.core.width; x++) {
+                const index = this.physics.core.getIndex(x, y);
+                
+                if (index !== -1 && this.physics.core.type[index] === this.physics.TYPE.WATER) {
+                    // Use actual soil line for each column
+                    const groundLevel = this.getGroundLevel(x);
+                    
+                    // 20% chance of immediate removal
+                    if (Math.random() < 0.2) {
+                        this.convertWaterByElevation(index, y, groundLevel);
+                    }
+                }
+            }
+        }
     },
 
     // Convert water to air or soil based on elevation
@@ -115,8 +107,14 @@ const FluidDynamicsSystem = {
         }
     },
 
-    // Get ground level (reused in several places)
-    getGroundLevel: function() {
+    // Get ground level for a specific x coordinate using the actual soil line
+    getGroundLevel: function(x) {
+        // If x is provided, use the soil height at that position
+        if (x !== undefined) {
+            return this.physics.core.getSoilHeight(x, this.frameCount);
+        }
+        
+        // Fallback to the default value (for backward compatibility)
         return Math.floor(this.physics.core.height * 0.7);
     },
 
@@ -130,7 +128,7 @@ const FluidDynamicsSystem = {
         const stuckCounter = this.physics.core.metadata[index];
 
         // Check for evaporation or absorption based on position
-        const groundLevel = this.getGroundLevel();
+        const groundLevel = this.getGroundLevel(x);
 
         if (this.handleEvaporationAndAbsorption(index, y, stuckCounter, groundLevel)) {
             return; // Water was converted, no further processing needed

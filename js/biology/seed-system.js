@@ -85,27 +85,15 @@ const SeedSystem = {
                     }
                     this.core.energy[index] = Math.max(this.core.energy[index], initialEnergy);
                     
+                    // Create new plant using the plant system's helper method
+                    // This handles plant group IDs, species assignment, and genetic traits
+                    const parentSeedIndex = this.core.metadata[index] > 0 && this.core.metadata[index] < 200 ? 
+                        this.getSeedParentIndex(index) : null;
+                    
+                    const plantGroupId = this.biology.plantSystem.createNewPlant(x, y, index, parentSeedIndex);
+                    
                     // Record the origin of this plant for trunk positioning
-                    const plantGroupId = this.biology.plantSystem.nextPlantGroupId++;
-                    this.biology.plantSystem.plantGroups[index] = plantGroupId;
                     this.biology.plantSystem.plantOrigins[plantGroupId] = {x: x, y: y};
-                    
-                    // Assign a random plant species - each plant is unique
-                    let speciesIndex;
-                    
-                    // Check if this seed came from a flower with specific traits (inherit from parent)
-                    if (this.core.metadata[index] > 0 && this.core.metadata[index] < 200) {
-                        // Extract the flower type from metadata (high 4 bits)
-                        const flowerType = (this.core.metadata[index] >> 4) & 0xF;
-                        // Match flower type to corresponding plant species
-                        speciesIndex = flowerType % this.biology.plantSystem.plantSpecies.length;
-                    } else {
-                        // Otherwise completely random choice
-                        speciesIndex = Math.floor(Math.random() * this.biology.plantSystem.plantSpecies.length);
-                    }
-                    
-                    // Store species information for this plant group
-                    this.biology.plantSystem.plantSpeciesMap[plantGroupId] = speciesIndex;
                     
                     // Mark fire adaptation in the plant if the seed was fire-adapted
                     if (isFireAdapted) {
@@ -130,7 +118,7 @@ const SeedSystem = {
             // Higher germination chance when buried in soil with water
             if (surroundingWater > 20) { // Reduced from 30 to 20
                 // Base germination chance
-                let germinationChance = 0.55 * this.biology.growthRate; // Massively increased from 0.35 to 0.55
+                let germinationChance = 0.4 * this.biology.growthRate; // Reduced from 0.55 to 0.4 for better balance
                 
                 // Seeds too deep struggle to germinate - but still possible
                 if (soilDepth > 5) {
@@ -144,7 +132,7 @@ const SeedSystem = {
                 
                 // Fire-adapted seeds in recently burned areas get a boost
                 if (isFireAdapted && recentlyBurned) {
-                    germinationChance *= 2.0; // Double germination chance
+                    germinationChance *= 1.8; // Reduced from 2.0 to 1.8
                 }
                 
                 if (Math.random() < germinationChance) {
@@ -153,40 +141,28 @@ const SeedSystem = {
                     this.core.state[index] = this.STATE.ROOT;
 
                     // Initial root has water based on surrounding soil
-                    this.core.water[index] = Math.min(150, surroundingWater * 2); // Increased water amount
+                    this.core.water[index] = Math.min(120, surroundingWater * 1.8); // Reduced from 150 to 120 and from 2 to 1.8
 
                     // Base energy for roots from buried seeds
-                    let initialEnergy = 200;
+                    let initialEnergy = 180; // Reduced from 200 to 180
                     
                     // Fire-adapted plants in burned areas start with more energy
                     if (isFireAdapted && recentlyBurned) {
-                        initialEnergy = 300; // Even more energy for fire-adapted plants in burned soil
+                        initialEnergy = 280; // Reduced from 300 to 280
                     }
                     
                     // Roots from buried seeds start with extra energy
                     this.core.energy[index] = Math.max(this.core.energy[index], initialEnergy);
                     
+                    // Create new plant using the plant system's helper method
+                    // This handles plant group IDs, species assignment, and genetic traits
+                    const parentSeedIndex = this.core.metadata[index] > 0 && this.core.metadata[index] < 200 ? 
+                        this.getSeedParentIndex(index) : null;
+                    
+                    const plantGroupId = this.biology.plantSystem.createNewPlant(x, y, index, parentSeedIndex);
+                    
                     // Record the origin of this plant for trunk positioning
-                    const plantGroupId = this.biology.plantSystem.nextPlantGroupId++;
-                    this.biology.plantSystem.plantGroups[index] = plantGroupId;
                     this.biology.plantSystem.plantOrigins[plantGroupId] = {x: x, y: y};
-                    
-                    // Assign a random plant species for unique plants
-                    let speciesIndex;
-                    
-                    // Check if this seed came from a flower with specific traits
-                    if (this.core.metadata[index] > 0 && this.core.metadata[index] < 200) {
-                        // Extract the flower type from metadata (high 4 bits)
-                        const flowerType = (this.core.metadata[index] >> 4) & 0xF;
-                        // Match flower type to corresponding plant species
-                        speciesIndex = flowerType % this.biology.plantSystem.plantSpecies.length;
-                    } else {
-                        // Otherwise completely random species
-                        speciesIndex = Math.floor(Math.random() * this.biology.plantSystem.plantSpecies.length);
-                    }
-                    
-                    // Store species information for this plant group
-                    this.biology.plantSystem.plantSpeciesMap[plantGroupId] = speciesIndex;
                     
                     // Mark fire adaptation in the plant if the seed was fire-adapted
                     if (isFireAdapted) {
@@ -304,6 +280,40 @@ const SeedSystem = {
         }
         
         return depth;
+    },
+
+    // New method to track seed parentage
+    getSeedParentIndex: function(index) {
+        // Extract parent information from metadata if available
+        // Currently seeds don't store parent index information,
+        // so we return null for now, but this could be extended
+        return null;
+    },
+
+    // Modified method for seed creation from flowers
+    createSeedFromFlower: function(flowerIndex, x, y) {
+        // Create a seed at the given position
+        const index = this.core.getIndex(x, y);
+        if (index === -1 || this.core.type[index] !== this.TYPE.AIR) return false;
+        
+        // Create the seed
+        this.core.type[index] = this.TYPE.SEED;
+        this.core.water[index] = 20;
+        this.core.energy[index] = 100;
+        
+        // Get plant group information
+        const plantGroupId = this.biology.plantSystem.getPlantGroupId(flowerIndex);
+        const speciesIndex = this.biology.plantSystem.plantSpeciesMap[plantGroupId];
+        
+        // Store flower metadata in seed (for inheritance)
+        // Format: Lowest 4 bits = 0, Higher 4 bits = flower/species type
+        this.core.metadata[index] = ((speciesIndex & 0xF) << 4) | 0;
+        
+        // Record parent index in seed for evolution tracking
+        // The evolution system will use this to inherit traits
+        this.biology.handleReproduction(flowerIndex, index);
+        
+        return true;
     }
 };
 

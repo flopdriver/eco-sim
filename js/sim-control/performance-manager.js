@@ -9,7 +9,8 @@ const PerformanceManager = {
     fps: 0,
 
     // Active pixel management
-    maxActivePixels: 200000, // Safety limit to prevent performance issues
+    maxActivePixels: 500000, // Increased from 200000 to 500000
+    pruningThreshold: 0.8, // Start pruning when we reach 80% of max
 
     // Initialize performance manager
     init: function(controller) {
@@ -40,9 +41,9 @@ const PerformanceManager = {
 
     // Manage active pixels with performance considerations
     manageActivePixels: function(pixelSet) {
-        // Safety check: limit active pixels to prevent performance issues
-        if (pixelSet.size > this.maxActivePixels) {
-            console.warn(`Too many active pixels (${pixelSet.size}), pruning to ${this.maxActivePixels}`);
+        // Only prune if we exceed the threshold
+        if (pixelSet.size > this.maxActivePixels * this.pruningThreshold) {
+            console.warn(`Active pixels (${pixelSet.size}) approaching limit, pruning to ${this.maxActivePixels}`);
             this.pruneActivePixels(pixelSet);
         }
     },
