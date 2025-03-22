@@ -7,10 +7,10 @@ window.PlantStemSystem = {
 
     // Trunk development parameters
     trunkParams: {
-        initialTrunkHeight: 300
+        initialTrunkHeight: 200
         ,   // Initial trunk height before branching
-        trunkThicknessVariation: 10, // Variation in trunk thickness
-        maxTrunkHeight: 500,         // Maximum height before extensive branching
+        trunkThicknessVariation: 3, // Variation in trunk thickness
+        maxTrunkHeight: 600,         // Maximum height before extensive branching
         trunkColorVariations: [
             { r: 110, g: 70, b: 40 },   // Brown
             { r: 100, g: 65, b: 35 },   // Darker brown

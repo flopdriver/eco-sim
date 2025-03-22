@@ -147,64 +147,142 @@ describe('TemperatureSystem', () => {
     Math.random = originalRandom;
   });
   
-  test('extreme temperatures reduce energy for creatures', () => {
-    // Set up test scenario - insect
+  test('extreme temperatures affect creature energy through actual system updates', () => {
+    // Set up test scenario - insect with moderate energy
     const insectIndex = mockCore.getIndex(2, 2);
-    
     mockCore.type[insectIndex] = mockEnvironment.TYPE.INSECT;
-    mockCore.energy[insectIndex] = 10;
+    mockCore.energy[insectIndex] = 50; // Start with moderate energy
     
     // Set extreme temperature
     mockEnvironment.temperature = 50; // Very cold
     
-    // Mock Math.random to ensure energy reduction happens
-    // First, the creature activity check should pass, then the energy reduction check
-    const originalRandom = Math.random;
-    const mockRandom = jest.fn();
-    mockRandom.mockReturnValueOnce(0.001); // Energy reduction check
-    Math.random = mockRandom;
+    // Test multiple scenarios
+    const scenarios = [
+      { randomValue: 0.001, expectedEnergyChange: -2 },  // Very low random (high energy loss)
+      { randomValue: 0.5, expectedEnergyChange: -1 },    // Medium random (normal energy loss)
+      { randomValue: 0.999, expectedEnergyChange: 0 }    // High random (no energy loss)
+    ];
     
-    // Manually apply energy reduction since we're mocking the random check
-    mockCore.energy[insectIndex] -= 1;
-    
-    // Mark pixel as active (we're testing the logic, not the activation)
-    nextActivePixels.add(insectIndex);
-    
-    // Verify energy decreased and pixel was marked active
-    expect(mockCore.energy[insectIndex]).toBe(9);
-    expect(nextActivePixels.has(insectIndex)).toBe(true);
-    
-    // Restore Math.random
-    Math.random = originalRandom;
+    for (const scenario of scenarios) {
+      // Reset energy for each scenario
+      mockCore.energy[insectIndex] = 50;
+      
+      // Set random value for this scenario
+      jest.spyOn(Math, 'random').mockReturnValue(scenario.randomValue);
+      
+      // Run the actual temperature update
+      TemperatureSystem.updateTemperature(nextActivePixels);
+      
+      // Verify energy change
+      expect(mockCore.energy[insectIndex]).toBe(50 + scenario.expectedEnergyChange);
+      
+      // Verify pixel was marked active if energy changed
+      if (scenario.expectedEnergyChange !== 0) {
+        expect(nextActivePixels.has(insectIndex)).toBe(true);
+      }
+    }
   });
   
-  test('creatures die when energy is depleted due to temperature effects', () => {
-    // Set up test scenario - worm with almost no energy
+  test('creatures die from temperature effects through actual system updates', () => {
+    // Set up test scenario - worm with low energy
     const wormIndex = mockCore.getIndex(4, 8);
-    
     mockCore.type[wormIndex] = mockEnvironment.TYPE.WORM;
-    mockCore.energy[wormIndex] = 1; // Just enough energy to survive one more hit
+    mockCore.energy[wormIndex] = 2; // Just enough energy to potentially die
     
     // Set extreme temperature
     mockEnvironment.temperature = 50; // Very cold
     
-    // Mock Math.random to ensure energy reduction happens
-    const originalRandom = Math.random;
-    const mockRandom = jest.fn();
-    mockRandom.mockReturnValueOnce(0.001); // Energy reduction check
-    Math.random = mockRandom;
+    // Test death scenario
+    jest.spyOn(Math, 'random').mockReturnValue(0.001); // Very low random to ensure energy loss
     
-    // Manually simulate the effects that would happen with our mocked random values
-    mockCore.energy[wormIndex] = 0; // Reduce to zero
-    mockCore.type[wormIndex] = mockEnvironment.TYPE.DEAD_MATTER; // Die
-    nextActivePixels.add(wormIndex); // Mark as active
+    // Run the actual temperature update
+    TemperatureSystem.updateTemperature(nextActivePixels);
     
-    // Check if energy reached zero and worm died
+    // Verify the actual system behavior
     expect(mockCore.energy[wormIndex]).toBe(0);
     expect(mockCore.type[wormIndex]).toBe(mockEnvironment.TYPE.DEAD_MATTER);
     expect(nextActivePixels.has(wormIndex)).toBe(true);
     
-    // Restore Math.random
-    Math.random = originalRandom;
+    // Verify death effects
+    expect(mockCore.nutrient[wormIndex]).toBeGreaterThan(0); // Should leave nutrients
+    expect(mockCore.state[wormIndex]).toBe(mockEnvironment.STATE.DEFAULT);
+  });
+  
+  test('water evaporation should vary based on temperature and conditions', () => {
+    // Set up multiple water bodies with different conditions
+    const waterBodies = [
+      { x: 5, y: 5, depth: 100, airAbove: true },    // Deep water with air
+      { x: 5, y: 6, depth: 50, airAbove: true },     // Medium water with air
+      { x: 5, y: 7, depth: 25, airAbove: false }     // Shallow water without air
+    ];
+    
+    // Set up the water bodies and their surroundings
+    waterBodies.forEach(body => {
+      const waterIndex = mockCore.getIndex(body.x, body.y);
+      const airIndex = mockCore.getIndex(body.x, body.y - 1);
+      
+      // Set up water
+      mockCore.type[waterIndex] = mockEnvironment.TYPE.WATER;
+      mockCore.water[waterIndex] = body.depth;
+      
+      // Set up air above if needed
+      if (body.airAbove) {
+        mockCore.type[airIndex] = mockEnvironment.TYPE.AIR;
+        mockCore.water[airIndex] = 0;
+      } else {
+        mockCore.type[airIndex] = mockEnvironment.TYPE.SOIL;
+      }
+    });
+    
+    // Test multiple temperature scenarios
+    const scenarios = [
+      { temperature: 150, randomValue: 0.001, expectedEvaporation: true },   // Hot with low random
+      { temperature: 150, randomValue: 0.5, expectedEvaporation: false },    // Hot with medium random
+      { temperature: 100, randomValue: 0.001, expectedEvaporation: false },  // Cool with low random
+      { temperature: 200, randomValue: 0.5, expectedEvaporation: true }      // Very hot with medium random
+    ];
+    
+    for (const scenario of scenarios) {
+      // Reset water levels
+      waterBodies.forEach(body => {
+        const waterIndex = mockCore.getIndex(body.x, body.y);
+        mockCore.water[waterIndex] = body.depth;
+      });
+      
+      // Set temperature and random value
+      mockEnvironment.temperature = scenario.temperature;
+      jest.spyOn(Math, 'random').mockReturnValue(scenario.randomValue);
+      
+      // Run temperature update
+      TemperatureSystem.updateTemperature(nextActivePixels);
+      
+      // Verify evaporation behavior
+      waterBodies.forEach((body, i) => {
+        const waterIndex = mockCore.getIndex(body.x, body.y);
+        const airIndex = mockCore.getIndex(body.x, body.y - 1);
+        
+        if (scenario.expectedEvaporation && body.airAbove) {
+          // Water should evaporate if conditions are right
+          expect(mockCore.type[waterIndex]).toBe(mockEnvironment.TYPE.AIR);
+          expect(mockCore.water[airIndex]).toBeGreaterThan(0); // Some water in air
+          expect(nextActivePixels.has(waterIndex)).toBe(true);
+          
+          // Deeper water should evaporate more slowly
+          if (i > 0) {
+            const prevWaterIndex = mockCore.getIndex(waterBodies[i-1].x, waterBodies[i-1].y);
+            expect(mockCore.water[waterIndex]).toBeLessThanOrEqual(
+              mockCore.water[prevWaterIndex]
+            );
+          }
+        } else {
+          // Water should not evaporate
+          expect(mockCore.type[waterIndex]).toBe(mockEnvironment.TYPE.WATER);
+          expect(mockCore.water[waterIndex]).toBe(body.depth);
+          if (body.airAbove) {
+            expect(mockCore.water[airIndex]).toBe(0);
+          }
+        }
+      });
+    }
   });
 });

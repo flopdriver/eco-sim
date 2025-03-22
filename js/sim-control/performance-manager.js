@@ -9,7 +9,7 @@ const PerformanceManager = {
     fps: 0,
 
     // Active pixel management
-    maxActivePixels: 100000, // Safety limit to prevent performance issues
+    maxActivePixels: 200000, // Safety limit to prevent performance issues
 
     // Initialize performance manager
     init: function(controller) {

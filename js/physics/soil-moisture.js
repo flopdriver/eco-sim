@@ -310,29 +310,38 @@ const SoilMoistureSystem = {
             nextActivePixels.add(index);
         }
     },
-    
-    // Update soil state based on water content
+
+    // Update soil state based on water content and compaction level
     updateSoilState: function(index) {
         // Skip if not soil
         if (this.physics.core.type[index] !== this.physics.TYPE.SOIL) return;
-        
-        // Get current state and water level
+
+        // Get current state, water level, and nutrient level (compaction)
         const currentState = this.physics.core.state[index];
         const waterLevel = this.physics.core.water[index];
-        
+        const nutrientLevel = this.physics.core.nutrient[index];
+
         // Keep layer type states (CLAY, SANDY, LOAMY, ROCKY) when updating moisture state
         // Only update WET/DRY status if it's a basic soil type
-        const isSoilLayer = currentState === this.physics.STATE.CLAY || 
-                         currentState === this.physics.STATE.SANDY ||
-                         currentState === this.physics.STATE.LOAMY ||
-                         currentState === this.physics.STATE.ROCKY;
-        
+        const isSoilLayer = currentState === this.physics.STATE.CLAY ||
+            currentState === this.physics.STATE.SANDY ||
+            currentState === this.physics.STATE.LOAMY ||
+            currentState === this.physics.STATE.ROCKY;
+
         // Don't override existing special soil types with basic WET/DRY states
         if (!isSoilLayer && currentState !== this.physics.STATE.FERTILE) {
             if (waterLevel > 20) {
                 this.physics.core.state[index] = this.physics.STATE.WET;
-            } else if (currentState !== this.physics.STATE.FERTILE) {
+            } else {
                 this.physics.core.state[index] = this.physics.STATE.DRY;
+            }
+
+            // Check for heavily compacted soil
+            if (nutrientLevel > 180) {
+                // Highly compacted soil has a chance to become fertile
+                if (Math.random() < 0.05) {
+                    this.physics.core.state[index] = this.physics.STATE.FERTILE;
+                }
             }
         }
     }

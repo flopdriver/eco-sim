@@ -340,7 +340,8 @@ const WeatherSystem = {
         }
     },
 
-    // Create dynamic rain
+    // Modified updateRain function with dramatically faster rain
+
     updateRain: function(nextActivePixels) {
         const core = this.environment.core;
         const maxDroplets = this.rainProperties.maxDropletsPerTick;
@@ -350,7 +351,7 @@ const WeatherSystem = {
         for (let i = 0; i < maxDroplets; i++) {
             // Skip if intensity check fails
             if (Math.random() > intensity) continue;
-            
+
             // Find a cloud pixel as the source of rain
             if (this.cloudProperties.cloudPixels.length === 0) {
                 this.createInitialClouds();
@@ -372,23 +373,24 @@ const WeatherSystem = {
                 const r = Math.random();
                 if (r < this.rainProperties.dropletSizes.small.probability) {
                     dropletType = 'small';
-                } else if (r < this.rainProperties.dropletSizes.small.probability + 
-                           this.rainProperties.dropletSizes.medium.probability) {
+                } else if (r < this.rainProperties.dropletSizes.small.probability +
+                    this.rainProperties.dropletSizes.medium.probability) {
                     dropletType = 'medium';
                 } else {
                     dropletType = 'large';
                 }
-                
+
                 const dropletConfig = this.rainProperties.dropletSizes[dropletType];
-                
+
                 // Create water droplet
                 core.type[index] = this.environment.TYPE.WATER;
                 core.water[index] = dropletConfig.water;
 
+                // MASSIVE SPEED BOOST: Multiply initial speed by 5-10x
                 this.rainProperties.droplets.push({
                     x: x,
                     y: cloudSource.y + 1,
-                    speed: dropletConfig.speed * (0.8 + Math.random() * 0.4),
+                    speed: dropletConfig.speed * (50.0 + Math.random() * 5.0), // Dramatically increased!
                     type: dropletType,
                     size: dropletConfig.water
                 });
@@ -397,52 +399,77 @@ const WeatherSystem = {
             }
         }
 
-        // Move existing droplets
+        // Move existing droplets - use large steps to make rain fall dramatically faster
         const updatedDroplets = [];
         for (const droplet of this.rainProperties.droplets) {
-            // Calculate new y position based on speed
-            const newY = droplet.y + droplet.speed;
+            // CHANGE: Make larger steps per frame - move drop by its full speed
+            const newY = Math.floor(droplet.y + droplet.speed);
             const newIndex = core.getIndex(droplet.x, newY);
-            
-            // Handle collision with ground or other pixels
-            if (newIndex === -1 || core.type[newIndex] !== this.environment.TYPE.AIR) {
+
+            // Only consider it a collision if it hits something that isn't air
+            if (newIndex === -1 || (core.type[newIndex] !== this.environment.TYPE.AIR)) {
                 // Create splash effect if enabled
                 if (this.rainProperties.splashEnabled) {
                     const splashSize = droplet.size / 100; // Scale splash based on droplet size
-                    
-                    // Create smaller water droplets in nearby pixels
-                    for (let sx = -1; sx <= 1; sx++) {
-                        if (Math.random() > splashSize * 0.3) continue;
-                        
+
+                    // Create more dramatic splash effects
+                    for (let sx = -2; sx <= 2; sx++) {
+                        if (Math.random() > splashSize * 0.1) continue; // Much higher chance of splash
+
                         const splashIndex = core.getIndex(droplet.x + sx, droplet.y);
                         if (splashIndex !== -1 && core.type[splashIndex] === this.environment.TYPE.AIR) {
                             core.type[splashIndex] = this.environment.TYPE.WATER;
-                            core.water[splashIndex] = Math.floor(droplet.size * 0.3);
+                            core.water[splashIndex] = Math.floor(droplet.size * 0.5); // Bigger splashes
                             nextActivePixels.add(splashIndex);
                         }
                     }
                 }
-                
+
                 // Add water to existing water pixel or soil
                 const currentIndex = core.getIndex(droplet.x, droplet.y);
                 if (currentIndex !== -1) {
                     if (core.type[currentIndex] === this.environment.TYPE.WATER) {
-                        core.water[currentIndex] += droplet.size * 0.2;
+                        core.water[currentIndex] += droplet.size * 0.3; // More water impact
                     } else if (core.type[currentIndex] === this.environment.TYPE.SOIL) {
-                        core.moisture[currentIndex] = Math.min(255, 
-                            (core.moisture[currentIndex] || 0) + droplet.size * 0.5);
+                        core.moisture[currentIndex] = Math.min(255,
+                            (core.moisture[currentIndex] || 0) + droplet.size * 0.8); // More soil moisture
                     }
                     nextActivePixels.add(currentIndex);
                 }
-                
+
                 continue; // Don't keep this droplet
             }
-            
-            // Update droplet position
+
+            // Fill in all air pixels along the path for faster drops to avoid "skipping" rendering
+            if (droplet.speed > 1) {
+                // For very fast drops, fill in intermediate pixels to avoid gaps
+                const startY = Math.floor(droplet.y);
+                const distance = newY - startY;
+
+                // Only fill gaps if the drop is moving more than a few pixels per frame
+                if (distance > 3) {
+                    // Fill in some intermediate pixels to create a "rain streak" effect
+                    const skipFactor = Math.max(1, Math.floor(distance / 4)); // Only draw some pixels for performance
+
+                    for (let step = skipFactor; step < distance; step += skipFactor) {
+                        const midY = startY + step;
+                        const midIndex = core.getIndex(droplet.x, midY);
+
+                        if (midIndex !== -1 && core.type[midIndex] === this.environment.TYPE.AIR) {
+                            // Create water droplet with less water (streak effect)
+                            core.type[midIndex] = this.environment.TYPE.WATER;
+                            core.water[midIndex] = Math.floor(droplet.size * 0.3);
+                            nextActivePixels.add(midIndex);
+                        }
+                    }
+                }
+            }
+
+            // Update droplet position at the end point
             core.type[newIndex] = this.environment.TYPE.WATER;
             core.water[newIndex] = droplet.size;
             nextActivePixels.add(newIndex);
-            
+
             // Clear previous position if it was water
             const oldIndex = core.getIndex(droplet.x, droplet.y);
             if (oldIndex !== -1 && core.type[oldIndex] === this.environment.TYPE.WATER) {
@@ -450,11 +477,11 @@ const WeatherSystem = {
                 core.water[oldIndex] = 0;
                 nextActivePixels.add(oldIndex);
             }
-            
-            // Increase speed (acceleration due to gravity)
-            droplet.speed = Math.min(droplet.speed * 1.12, 35); // Increased acceleration from 1.05 to 1.12 and cap from 25 to 35
+
+            // MASSIVE acceleration boost - nearly double speed each frame with very high cap
+            droplet.speed = Math.min(droplet.speed * 5, 2000); // Dramatic acceleration with very high cap
             droplet.y = newY;
-            
+
             updatedDroplets.push(droplet);
         }
 

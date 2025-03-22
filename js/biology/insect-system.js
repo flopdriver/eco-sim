@@ -59,7 +59,7 @@ const InsectSystem = {
         this.core.energy[index] -= 1 * this.biology.metabolism;
 
         // If couldn't eat in previous ticks, increase starvation counter
-        if (this.core.energy[index] < 150) {
+        if (this.core.energy[index] < 300) {
             this.core.metadata[index].starvationCounter++; // Increment starvation counter
         } else {
             // Reset starvation counter if well-fed

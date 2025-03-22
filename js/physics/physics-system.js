@@ -67,7 +67,8 @@ const PhysicsSystem = {
                 this.TYPE.SEED,
                 this.TYPE.DEAD_MATTER,
                 this.TYPE.INSECT,
-                this.TYPE.WORM
+                this.TYPE.WORM,
+                this.TYPE.SOIL
             ];
             
             // Check for pixels that should be falling but aren't active

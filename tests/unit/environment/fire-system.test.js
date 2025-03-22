@@ -152,7 +152,7 @@ describe('FireSystem', () => {
   });
 
   // Test fire spreading to neighboring plants
-  test('spreadFire should spread to neighboring plants based on flammability', () => {
+  test('spreadFire should handle various spread scenarios correctly', () => {
     // Set up a burning plant
     const sourceX = 10;
     const sourceY = 10;
@@ -162,22 +162,58 @@ describe('FireSystem', () => {
     mockCore.metadata[sourceIndex] = 100; // Established fire
     FireSystem.fireProperties.activeFires.add(sourceIndex);
     
-    // Set up a neighboring plant
-    const neighborX = 11;
-    const neighborY = 10;
-    const neighborIndex = mockCore.getIndex(neighborX, neighborY);
-    mockCore.type[neighborIndex] = mockEnvironment.TYPE.PLANT;
-    mockCore.state[neighborIndex] = mockEnvironment.STATE.LEAF; // More flammable
+    // Set up neighboring plants with different conditions
+    const neighbors = [
+      { x: 11, y: 10, state: mockEnvironment.STATE.LEAF, water: 0 },    // Dry leaf (highly flammable)
+      { x: 10, y: 11, state: mockEnvironment.STATE.STEM, water: 50 },   // Wet stem (less flammable)
+      { x: 9, y: 10, state: mockEnvironment.STATE.ROOT, water: 100 }    // Wet root (least flammable)
+    ];
     
-    // Ensure random value is low enough to guarantee spread
-    jest.spyOn(Math, 'random').mockReturnValue(0.01);
+    // Set up the neighboring plants
+    neighbors.forEach(neighbor => {
+      const index = mockCore.getIndex(neighbor.x, neighbor.y);
+      mockCore.type[index] = mockEnvironment.TYPE.PLANT;
+      mockCore.state[index] = neighbor.state;
+      mockCore.water[index] = neighbor.water;
+    });
     
-    // Spread fire
-    FireSystem.spreadFire(sourceIndex, FireSystem.fireProperties.spreadProbability, nextActivePixels);
+    // Test multiple random scenarios
+    const scenarios = [
+      { randomValue: 0.01, expectedSpreads: 2 },  // Very low random (should spread to dry and wet stem)
+      { randomValue: 0.3, expectedSpreads: 1 },   // Medium random (should only spread to dry leaf)
+      { randomValue: 0.9, expectedSpreads: 0 }    // High random (should not spread)
+    ];
     
-    // Validate fire spread
-    expect(FireSystem.fireProperties.activeFires.has(neighborIndex)).toBe(true);
-    expect(mockCore.metadata[neighborIndex]).toBe(1); // Fire just started on neighbor
+    for (const scenario of scenarios) {
+      // Reset the fire system state
+      FireSystem.fireProperties.activeFires.clear();
+      FireSystem.fireProperties.activeFires.add(sourceIndex);
+      
+      // Set random value for this scenario
+      jest.spyOn(Math, 'random').mockReturnValue(scenario.randomValue);
+      
+      // Spread fire
+      FireSystem.spreadFire(sourceIndex, FireSystem.fireProperties.spreadProbability, nextActivePixels);
+      
+      // Count how many neighbors caught fire
+      const spreadCount = neighbors.filter(neighbor => {
+        const index = mockCore.getIndex(neighbor.x, neighbor.y);
+        return FireSystem.fireProperties.activeFires.has(index);
+      }).length;
+      
+      // Verify spread count matches expected
+      expect(spreadCount).toBe(scenario.expectedSpreads);
+      
+      // Verify fire properties on spread pixels
+      neighbors.forEach(neighbor => {
+        const index = mockCore.getIndex(neighbor.x, neighbor.y);
+        if (FireSystem.fireProperties.activeFires.has(index)) {
+          expect(mockCore.metadata[index]).toBe(1); // Fire just started
+          expect(mockCore.energy[index]).toBe(FireSystem.fireProperties.fireIntensity);
+          expect(nextActivePixels.has(index)).toBe(true);
+        }
+      });
+    }
   });
 
   // Test fire burning progress and conversion to soil
@@ -227,44 +263,56 @@ describe('FireSystem', () => {
   });
 
   // Test spontaneous combustion
-  test('checkSpontaneousCombustion triggers fires in hot dry conditions', () => {
-    // Set up favorable conditions for spontaneous combustion
-    mockEnvironment.temperature = 220; // Very hot
+  test('spontaneous combustion should occur based on environmental conditions', () => {
+    // Set up multiple plants with different conditions
+    const plants = [
+      { x: 10, y: 10, water: 5, temperature: 220 },    // Hot and dry (should combust)
+      { x: 15, y: 10, water: 50, temperature: 220 },   // Hot but wet (should not combust)
+      { x: 20, y: 10, water: 5, temperature: 150 }     // Dry but cool (should not combust)
+    ];
     
-    // Set up a dry plant
-    const index = mockCore.getIndex(10, 10);
-    mockCore.type[index] = mockEnvironment.TYPE.PLANT;
-    mockCore.water[index] = 5; // Very dry
-    
-    // Before starting our test, empty the active fires
-    FireSystem.fireProperties.activeFires.clear();
-    
-    // Force random values to ensure success with our mocks
-    const originalRandom = Math.random;
-    const originalFloor = Math.floor;
-    
-    // Force Math.random for both the combustion check and sample selection
-    Math.random = jest.fn()
-      .mockReturnValueOnce(0.00001) // Combustion check (ensure it passes)
-      .mockReturnValueOnce(0.5)     // Position selection X coordinate
-      .mockReturnValueOnce(0.5);    // Position selection Y coordinate
-    
-    // Force Math.floor to return values that will select our planted test plant
-    Math.floor = jest.fn((num) => {
-      if (num === mockCore.width * 0.5) return 10; // X coordinate
-      if (num === mockCore.height * 0.5) return 10; // Y coordinate
-      return originalFloor(num);
+    // Set up the plants
+    plants.forEach(plant => {
+      const index = mockCore.getIndex(plant.x, plant.y);
+      mockCore.type[index] = mockEnvironment.TYPE.PLANT;
+      mockCore.water[index] = plant.water;
     });
     
-    // Manually start a fire for testing
-    FireSystem.startFire(index, nextActivePixels);
+    // Test multiple scenarios
+    const scenarios = [
+      { temperature: 220, randomValue: 0.001, expectedCombustion: true },   // Hot with low random
+      { temperature: 220, randomValue: 0.5, expectedCombustion: false },    // Hot with medium random
+      { temperature: 150, randomValue: 0.001, expectedCombustion: false },  // Cool with low random
+      { temperature: 250, randomValue: 0.5, expectedCombustion: true }      // Very hot with medium random
+    ];
     
-    // Validate a fire started
-    expect(FireSystem.fireProperties.activeFires.size).toBeGreaterThan(0);
-    
-    // Restore Math functions
-    Math.random = originalRandom;
-    Math.floor = originalFloor;
+    for (const scenario of scenarios) {
+      // Reset environment and fire system
+      mockEnvironment.temperature = scenario.temperature;
+      FireSystem.fireProperties.activeFires.clear();
+      
+      // Set random value for this scenario
+      jest.spyOn(Math, 'random').mockReturnValue(scenario.randomValue);
+      
+      // Run spontaneous combustion check
+      FireSystem.checkSpontaneousCombustion(nextActivePixels);
+      
+      // Verify combustion behavior
+      plants.forEach((plant, i) => {
+        const index = mockCore.getIndex(plant.x, plant.y);
+        if (scenario.expectedCombustion && plant.water < 10) {
+          // Plant should catch fire if conditions are right
+          expect(FireSystem.fireProperties.activeFires.has(index)).toBe(true);
+          expect(mockCore.metadata[index]).toBe(1); // Fire just started
+          expect(mockCore.energy[index]).toBe(FireSystem.fireProperties.fireIntensity);
+          expect(nextActivePixels.has(index)).toBe(true);
+        } else {
+          // Plant should not catch fire
+          expect(FireSystem.fireProperties.activeFires.has(index)).toBe(false);
+          expect(mockCore.type[index]).toBe(mockEnvironment.TYPE.PLANT);
+        }
+      });
+    }
   });
 
   // Test fire spreading from dead matter
@@ -369,66 +417,68 @@ describe('FireSystem', () => {
   });
 
   // Test fire resistance of different plant parts
-  test('different plant parts should have different flammability', () => {
+  test('different plant parts should have different flammability based on actual system behavior', () => {
     // Create 4 plants with different parts
-    const leafIndex = mockCore.getIndex(5, 5);
-    const stemIndex = mockCore.getIndex(6, 5);
-    const flowerIndex = mockCore.getIndex(7, 5);
-    const rootIndex = mockCore.getIndex(8, 5);
+    const plants = [
+      { x: 5, y: 5, state: mockEnvironment.STATE.LEAF },    // Leaf (should burn fastest)
+      { x: 6, y: 5, state: mockEnvironment.STATE.FLOWER },  // Flower (should burn medium-fast)
+      { x: 7, y: 5, state: mockEnvironment.STATE.STEM },    // Stem (should burn medium)
+      { x: 8, y: 5, state: mockEnvironment.STATE.ROOT }     // Root (should burn slowest)
+    ];
     
-    mockCore.type[leafIndex] = mockEnvironment.TYPE.PLANT;
-    mockCore.type[stemIndex] = mockEnvironment.TYPE.PLANT;
-    mockCore.type[flowerIndex] = mockEnvironment.TYPE.PLANT;
-    mockCore.type[rootIndex] = mockEnvironment.TYPE.PLANT;
+    // Set up the plants
+    plants.forEach(plant => {
+      const index = mockCore.getIndex(plant.x, plant.y);
+      mockCore.type[index] = mockEnvironment.TYPE.PLANT;
+      mockCore.state[index] = plant.state;
+      mockCore.water[index] = 0; // Dry plants for consistent testing
+    });
     
-    mockCore.state[leafIndex] = mockEnvironment.STATE.LEAF;
-    mockCore.state[stemIndex] = mockEnvironment.STATE.STEM;
-    mockCore.state[flowerIndex] = mockEnvironment.STATE.FLOWER;
-    mockCore.state[rootIndex] = mockEnvironment.STATE.ROOT;
+    // Start fires on all plants
+    plants.forEach(plant => {
+      const index = mockCore.getIndex(plant.x, plant.y);
+      FireSystem.startFire(index, nextActivePixels);
+    });
     
-    // Mock the plant flammability factors to ensure clear differences
-    const originalFlammability = { ...FireSystem.fireProperties.plantFlammability };
+    // Reset metadata to ensure consistent starting point
+    plants.forEach(plant => {
+      const index = mockCore.getIndex(plant.x, plant.y);
+      mockCore.metadata[index] = 1;
+    });
     
-    // Set up clearly differentiated flammability rates for testing
-    FireSystem.fireProperties.plantFlammability.leaf = 2.0;    // Leaves burn fastest
-    FireSystem.fireProperties.plantFlammability.flower = 1.5;  // Flowers burn medium-fast
-    FireSystem.fireProperties.plantFlammability.stem = 1.2;    // Stems burn medium
-    FireSystem.fireProperties.plantFlammability.root = 0.5;    // Roots burn slowest
-    
-    // Start fires on all of them
-    FireSystem.startFire(leafIndex, nextActivePixels);
-    FireSystem.startFire(stemIndex, nextActivePixels);
-    FireSystem.startFire(flowerIndex, nextActivePixels);
-    FireSystem.startFire(rootIndex, nextActivePixels);
-    
-    // Reset metadata to 1 to ensure consistent starting point
-    mockCore.metadata[leafIndex] = 1;
-    mockCore.metadata[stemIndex] = 1;
-    mockCore.metadata[flowerIndex] = 1;
-    mockCore.metadata[rootIndex] = 1;
-    
-    // Modified implementation for direct test of burn rate vs. part type
-    // We'll manually apply the flammability factor to simulate burns
+    // Run multiple updates to observe actual burn rates
     for (let i = 0; i < 10; i++) {
-      // Manually simulate the burn rate difference
-      mockCore.metadata[leafIndex] += 2 * FireSystem.fireProperties.plantFlammability.leaf;
-      mockCore.metadata[stemIndex] += 2 * FireSystem.fireProperties.plantFlammability.stem;
-      mockCore.metadata[flowerIndex] += 2 * FireSystem.fireProperties.plantFlammability.flower;
-      mockCore.metadata[rootIndex] += 2 * FireSystem.fireProperties.plantFlammability.root;
+      FireSystem.updateFires(nextActivePixels);
     }
     
+    // Verify relative burn rates using actual system behavior
+    const burnRates = plants.map(plant => {
+      const index = mockCore.getIndex(plant.x, plant.y);
+      return {
+        state: plant.state,
+        burnProgress: mockCore.metadata[index]
+      };
+    });
+    
     // Verify the relative burn rates: leaves > flowers > stems > roots
-    expect(mockCore.metadata[leafIndex]).toBeGreaterThan(mockCore.metadata[flowerIndex]);
-    expect(mockCore.metadata[flowerIndex]).toBeGreaterThan(mockCore.metadata[stemIndex]);
-    expect(mockCore.metadata[stemIndex]).toBeGreaterThan(mockCore.metadata[rootIndex]);
+    expect(burnRates[0].burnProgress).toBeGreaterThan(burnRates[1].burnProgress);
+    expect(burnRates[1].burnProgress).toBeGreaterThan(burnRates[2].burnProgress);
+    expect(burnRates[2].burnProgress).toBeGreaterThan(burnRates[3].burnProgress);
     
     // Verify all burn faster than roots specifically
-    expect(mockCore.metadata[leafIndex]).toBeGreaterThan(mockCore.metadata[rootIndex]);
-    expect(mockCore.metadata[stemIndex]).toBeGreaterThan(mockCore.metadata[rootIndex]);
-    expect(mockCore.metadata[flowerIndex]).toBeGreaterThan(mockCore.metadata[rootIndex]);
+    burnRates.forEach((rate, i) => {
+      if (i < 3) { // All except roots
+        expect(rate.burnProgress).toBeGreaterThan(burnRates[3].burnProgress);
+      }
+    });
     
-    // Restore original flammability values
-    FireSystem.fireProperties.plantFlammability = { ...originalFlammability };
+    // Verify energy consumption matches burn rates
+    plants.forEach((plant, i) => {
+      const index = mockCore.getIndex(plant.x, plant.y);
+      if (i < 3) { // All except roots
+        expect(mockCore.energy[index]).toBeLessThan(FireSystem.fireProperties.fireIntensity);
+      }
+    });
   });
 
   // Test maximum fire size limiting
@@ -459,28 +509,73 @@ describe('FireSystem', () => {
   });
 
   // Test smoke generation
-  test('burning should create smoke in the air above', () => {
-    // Set up a burning plant
-    const plantX = 10;
-    const plantY = 10;
-    const plantIndex = mockCore.getIndex(plantX, plantY);
-    mockCore.type[plantIndex] = mockEnvironment.TYPE.PLANT;
-    mockCore.metadata[plantIndex] = 50; // Established fire
-    FireSystem.fireProperties.activeFires.add(plantIndex);
+  test('smoke generation should vary based on fire intensity and conditions', () => {
+    // Set up multiple burning plants with different intensities
+    const plants = [
+      { x: 10, y: 10, intensity: 100 },  // Strong fire
+      { x: 15, y: 10, intensity: 50 },   // Medium fire
+      { x: 20, y: 10, intensity: 25 }    // Weak fire
+    ];
     
-    // Set up air pixels above
-    const airIndex = mockCore.getIndex(plantX, plantY - 2); // Above the fire
-    mockCore.type[airIndex] = mockEnvironment.TYPE.AIR;
-    mockCore.water[airIndex] = 0; // No smoke yet
+    // Set up the burning plants
+    plants.forEach(plant => {
+      const index = mockCore.getIndex(plant.x, plant.y);
+      mockCore.type[index] = mockEnvironment.TYPE.PLANT;
+      mockCore.metadata[index] = 50; // Established fire
+      mockCore.energy[index] = plant.intensity;
+      FireSystem.fireProperties.activeFires.add(index);
+    });
     
-    // Force random to create smoke
-    jest.spyOn(Math, 'random').mockReturnValue(0.01);
+    // Set up air pixels above each fire
+    const airPixels = plants.map(plant => ({
+      fireIndex: mockCore.getIndex(plant.x, plant.y),
+      airIndex: mockCore.getIndex(plant.x, plant.y - 2)
+    }));
     
-    // Update fire to add heat and potentially create smoke
-    FireSystem.addHeatToSurroundingAir(plantIndex, nextActivePixels);
+    // Initialize air pixels
+    airPixels.forEach(pixel => {
+      mockCore.type[pixel.airIndex] = mockEnvironment.TYPE.AIR;
+      mockCore.water[pixel.airIndex] = 0; // No smoke yet
+    });
     
-    // Validate smoke creation (represented by water content in air)
-    expect(mockCore.water[airIndex]).toBeGreaterThan(0);
+    // Test multiple scenarios
+    const scenarios = [
+      { randomValue: 0.01, expectedSmoke: true },   // Very low random (should create smoke)
+      { randomValue: 0.5, expectedSmoke: false },   // Medium random (should not create smoke)
+      { randomValue: 0.99, expectedSmoke: false }   // High random (should not create smoke)
+    ];
+    
+    for (const scenario of scenarios) {
+      // Reset smoke levels
+      airPixels.forEach(pixel => {
+        mockCore.water[pixel.airIndex] = 0;
+      });
+      
+      // Set random value for this scenario
+      jest.spyOn(Math, 'random').mockReturnValue(scenario.randomValue);
+      
+      // Add heat and potentially create smoke for each fire
+      airPixels.forEach(pixel => {
+        FireSystem.addHeatToSurroundingAir(pixel.fireIndex, nextActivePixels);
+      });
+      
+      // Verify smoke behavior
+      airPixels.forEach((pixel, i) => {
+        const plant = plants[i];
+        if (scenario.expectedSmoke) {
+          // Stronger fires should create more smoke
+          expect(mockCore.water[pixel.airIndex]).toBeGreaterThan(0);
+          if (i > 0) {
+            // Each subsequent fire should create less smoke than the previous
+            expect(mockCore.water[pixel.airIndex]).toBeLessThanOrEqual(
+              mockCore.water[airPixels[i-1].airIndex]
+            );
+          }
+        } else {
+          expect(mockCore.water[pixel.airIndex]).toBe(0);
+        }
+      });
+    }
   });
 
   // Test fire interaction with weather

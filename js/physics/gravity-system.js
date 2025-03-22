@@ -8,6 +8,8 @@ const GravitySystem = {
     // Gravity strength multiplier
     gravityStrength: 1.0,
 
+    soilCompactionStrength: 0.8, // 0-1 range, higher means more compaction
+
     // Initialize gravity system
     init: function(physicsSystem) {
         this.physics = physicsSystem;
@@ -17,7 +19,7 @@ const GravitySystem = {
 
     // Update gravity effects on objects
     updateGravity: function(activePixels, nextActivePixels) {
-        // Process items that should fall: seeds, dead matter, insects, worms
+        // Process items that should fall: seeds, dead matter, insects, worms, and now soil
         activePixels.forEach(index => {
             // Skip if already processed
             if (this.physics.processedThisFrame[index]) return;
@@ -25,16 +27,22 @@ const GravitySystem = {
             const type = this.physics.core.type[index];
 
             // Check if it's a type affected by gravity
-            const affectedByGravity = (
-                type === this.physics.TYPE.SEED ||
+            if (type === this.physics.TYPE.SEED ||
                 type === this.physics.TYPE.DEAD_MATTER ||
                 type === this.physics.TYPE.WORM ||
-                (type === this.physics.TYPE.INSECT && (this.physics.core.metadata[index] > 8 || Math.random() < 0.6)) // Increased insect falling chance
-            );
+                (type === this.physics.TYPE.INSECT && (this.physics.core.metadata[index] > 8 || Math.random() < 0.6))) {
 
-            if (affectedByGravity) {
                 const coords = this.physics.core.getCoords(index);
                 this.applyGravity(coords.x, coords.y, index, nextActivePixels);
+            }
+            // Special case for soil with different probability and behavior
+            else if (type === this.physics.TYPE.SOIL) {
+                const coords = this.physics.core.getCoords(index);
+
+                // Check if this soil should be affected by gravity
+                if (this.shouldSoilFall(coords.x, coords.y, index)) {
+                    this.applySoilGravity(coords.x, coords.y, index, nextActivePixels);
+                }
             }
         });
     },
@@ -212,5 +220,235 @@ const GravitySystem = {
         }
         
         return depth;
+    },
+
+    // Method to check if soil should fall (loose, unsupported soil)
+    shouldSoilFall: function(x, y, index) {
+        // Check what's below this soil pixel
+        const belowIndex = this.physics.core.getIndex(x, y + 1);
+
+        // If nothing below or air/water below, soil should fall
+        if (belowIndex === -1 ||
+            this.physics.core.type[belowIndex] === this.physics.TYPE.AIR ||
+            this.physics.core.type[belowIndex] === this.physics.TYPE.WATER) {
+            return true;
+        }
+
+        // Check for lack of support on sides and below (cave-in conditions)
+        // Left and right neighbors
+        const leftIndex = this.physics.core.getIndex(x - 1, y);
+        const rightIndex = this.physics.core.getIndex(x + 1, y);
+
+        // Diagonal support check
+        const diagonalLeftIndex = this.physics.core.getIndex(x - 1, y + 1);
+        const diagonalRightIndex = this.physics.core.getIndex(x + 1, y + 1);
+
+        // Count how many sides are unsupported
+        let unsupportedCount = 0;
+
+        // Check sides
+        if (leftIndex === -1 || this.physics.core.type[leftIndex] === this.physics.TYPE.AIR ||
+            this.physics.core.type[leftIndex] === this.physics.TYPE.WATER) {
+            unsupportedCount++;
+        }
+
+        if (rightIndex === -1 || this.physics.core.type[rightIndex] === this.physics.TYPE.AIR ||
+            this.physics.core.type[rightIndex] === this.physics.TYPE.WATER) {
+            unsupportedCount++;
+        }
+
+        // Check diagonals
+        if (diagonalLeftIndex === -1 || this.physics.core.type[diagonalLeftIndex] === this.physics.TYPE.AIR ||
+            this.physics.core.type[diagonalLeftIndex] === this.physics.TYPE.WATER) {
+            unsupportedCount++;
+        }
+
+        if (diagonalRightIndex === -1 || this.physics.core.type[diagonalRightIndex] === this.physics.TYPE.AIR ||
+            this.physics.core.type[diagonalRightIndex] === this.physics.TYPE.WATER) {
+            unsupportedCount++;
+        }
+
+        // Soil with many unsupported sides has a chance to fall
+        // More unsupported sides = higher chance to fall
+        const fallProbability = (unsupportedCount / 10) * this.soilCompactionStrength;
+
+        return Math.random() < fallProbability;
+    },
+
+    // Apply gravity to soil pixels (with special compaction behavior)
+    applySoilGravity: function(x, y, index, nextActivePixels) {
+        // Mark as processed
+        this.physics.processedThisFrame[index] = 1;
+
+        // Try moving directly down first
+        if (this.trySoilMoveDown(x, y, index, nextActivePixels)) {
+            return true;
+        }
+
+        // If direct down movement fails, try diagonal with lower probability than other objects
+        if (Math.random() < 0.15 * this.soilCompactionStrength) {
+            // Choose a diagonal direction randomly
+            const offset = Math.random() < 0.5 ? -1 : 1;
+            const diagonalX = x + offset;
+            const diagonalIndex = this.physics.core.getIndex(diagonalX, y + 1);
+
+            if (this.trySoilMoveDiagonal(index, diagonalIndex, nextActivePixels)) {
+                return true;
+            }
+        }
+
+        // If we couldn't move the soil, try compacting it by increasing density/nutrients
+        this.compactSoil(index);
+
+        // Keep the soil active for potential future movement
+        nextActivePixels.add(index);
+
+        return false;
+    },
+
+    // Helper method to try moving soil straight down
+    trySoilMoveDown: function(x, y, index, nextActivePixels) {
+        const downIndex = this.physics.core.getIndex(x, y + 1);
+
+        if (downIndex === -1) return false;
+
+        // Soil can fall into air or water
+        if (this.physics.core.type[downIndex] === this.physics.TYPE.AIR ||
+            this.physics.core.type[downIndex] === this.physics.TYPE.WATER) {
+
+            // Store the water content from the destination (in case it's water)
+            let destinationWater = 0;
+            if (this.physics.core.type[downIndex] === this.physics.TYPE.WATER) {
+                destinationWater = this.physics.core.water[downIndex];
+            }
+
+            // Move soil down
+            this.physics.core.type[downIndex] = this.physics.TYPE.SOIL;
+            this.physics.core.state[downIndex] = this.physics.core.state[index];
+            this.physics.core.water[downIndex] = this.physics.core.water[index];
+            this.physics.core.nutrient[downIndex] = this.physics.core.nutrient[index];
+
+            // If falling into water, add that water content to the soil
+            if (destinationWater > 0) {
+                this.physics.core.water[downIndex] = Math.min(255, this.physics.core.water[downIndex] + destinationWater);
+                if (this.physics.core.water[downIndex] > 20) {
+                    this.physics.core.state[downIndex] = this.physics.STATE.WET;
+                }
+            }
+
+            // Clear original position to air
+            this.physics.core.type[index] = this.physics.TYPE.AIR;
+            this.physics.core.water[index] = 0;
+            this.physics.core.nutrient[index] = 0;
+
+            // Mark both positions as active
+            nextActivePixels.add(downIndex);
+            nextActivePixels.add(index);
+
+            return true;
+        }
+
+        // Special case: soil compaction - if soil falls onto other soil, it might compact
+        if (this.physics.core.type[downIndex] === this.physics.TYPE.SOIL) {
+            // There's a small chance to compact the soil below and remove this soil
+            if (Math.random() < 0.05 * this.soilCompactionStrength) {
+                // Increase nutrients in the lower soil (compacting)
+                this.physics.core.nutrient[downIndex] = Math.min(255,
+                    this.physics.core.nutrient[downIndex] + this.physics.core.nutrient[index] + 10);
+
+                // Transfer any water content
+                this.physics.core.water[downIndex] = Math.min(255,
+                    this.physics.core.water[downIndex] + this.physics.core.water[index]);
+
+                // Update soil state based on water content
+                if (this.physics.core.water[downIndex] > 20) {
+                    // Don't change soil type, just update moisture status
+                    if (this.physics.core.state[downIndex] !== this.physics.STATE.CLAY &&
+                        this.physics.core.state[downIndex] !== this.physics.STATE.SANDY &&
+                        this.physics.core.state[downIndex] !== this.physics.STATE.LOAMY &&
+                        this.physics.core.state[downIndex] !== this.physics.STATE.ROCKY) {
+                        this.physics.core.state[downIndex] = this.physics.STATE.WET;
+                    }
+                }
+
+                // Remove this soil pixel and replace with air
+                this.physics.core.type[index] = this.physics.TYPE.AIR;
+                this.physics.core.water[index] = 0;
+                this.physics.core.nutrient[index] = 0;
+
+                // Mark both positions as active
+                nextActivePixels.add(downIndex);
+                nextActivePixels.add(index);
+
+                return true;
+            }
+        }
+
+        return false;
+    },
+
+    // Helper method to try moving soil diagonally down
+    trySoilMoveDiagonal: function(fromIndex, toIndex, nextActivePixels) {
+        if (toIndex === -1) return false;
+
+        // Soil can only move into air or water
+        if (this.physics.core.type[toIndex] === this.physics.TYPE.AIR ||
+            this.physics.core.type[toIndex] === this.physics.TYPE.WATER) {
+
+            // Store water content if destination is water
+            let destinationWater = 0;
+            if (this.physics.core.type[toIndex] === this.physics.TYPE.WATER) {
+                destinationWater = this.physics.core.water[toIndex];
+            }
+
+            // Move soil to new location
+            this.physics.core.type[toIndex] = this.physics.TYPE.SOIL;
+            this.physics.core.state[toIndex] = this.physics.core.state[fromIndex];
+            this.physics.core.water[toIndex] = this.physics.core.water[fromIndex];
+            this.physics.core.nutrient[toIndex] = this.physics.core.nutrient[fromIndex];
+
+            // Add water content if falling into water
+            if (destinationWater > 0) {
+                this.physics.core.water[toIndex] = Math.min(255, this.physics.core.water[toIndex] + destinationWater);
+                if (this.physics.core.water[toIndex] > 20) {
+                    this.physics.core.state[toIndex] = this.physics.STATE.WET;
+                }
+            }
+
+            // Clear original position to air
+            this.physics.core.type[fromIndex] = this.physics.TYPE.AIR;
+            this.physics.core.water[fromIndex] = 0;
+            this.physics.core.nutrient[fromIndex] = 0;
+
+            // Mark both positions as active
+            nextActivePixels.add(toIndex);
+            nextActivePixels.add(fromIndex);
+
+            return true;
+        }
+
+        return false;
+    },
+
+    // When soil can't fall, it compacts in place
+    compactSoil: function(index) {
+        // Skip if not soil anymore (sanity check)
+        if (this.physics.core.type[index] !== this.physics.TYPE.SOIL) return;
+
+        // Increase nutrient count (representing compaction)
+        // Limit to maximum value to prevent overflow
+        const currentNutrient = this.physics.core.nutrient[index];
+        this.physics.core.nutrient[index] = Math.min(255, currentNutrient + 1);
+
+        // If soil gets very compacted, it might become a special type
+        if (this.physics.core.nutrient[index] > 200 && Math.random() < 0.02) {
+            // Don't change the soil layer type (CLAY, SANDY, etc), just add fertility
+            if (this.physics.core.state[index] !== this.physics.STATE.CLAY &&
+                this.physics.core.state[index] !== this.physics.STATE.SANDY &&
+                this.physics.core.state[index] !== this.physics.STATE.LOAMY &&
+                this.physics.core.state[index] !== this.physics.STATE.ROCKY) {
+                this.physics.core.state[index] = this.physics.STATE.FERTILE;
+            }
+        }
     }
 };

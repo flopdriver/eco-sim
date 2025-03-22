@@ -230,47 +230,67 @@ describe('PlantSystem', () => {
     expect(PlantSystem.plantConnectivity.connectedToGround[leafIndex]).toBe(1);
   });
   
-  test('updateSinglePlant should call appropriate subsystem functions', () => {
-    // Set up test cases for different plant parts
-    const testCases = [
-      { state: PlantSystem.STATE.ROOT, updateFn: mockRootSystem.updateRoot },
-      { state: PlantSystem.STATE.STEM, updateFn: mockStemSystem.updateStem },
-      { state: PlantSystem.STATE.LEAF, updateFn: mockLeafSystem.updateLeaf },
-      { state: PlantSystem.STATE.FLOWER, updateFn: mockFlowerSystem.updateFlower }
+  test('updateSinglePlant should handle energy changes correctly across different scenarios', () => {
+    // Test multiple random scenarios
+    const testScenarios = [
+      { randomValue: 0.1, expectedEnergyChange: -5 },  // Low random value
+      { randomValue: 0.5, expectedEnergyChange: -2 },  // Medium random value
+      { randomValue: 0.9, expectedEnergyChange: 1 }    // High random value
     ];
     
-    // Override random for this test to ensure energy decreases
-    const originalRandom = Math.random;
-    Math.random = jest.fn().mockReturnValue(0.9); // High value to avoid random energy boost
-    
-    for (const testCase of testCases) {
+    for (const scenario of testScenarios) {
       // Clear processed flag
       mockBiology.processedThisFrame.fill(0);
       
-      // Set up a plant pixel with the test state
-      const index = mockCore.getIndex(20, 20);
-      mockCore.type[index] = PlantSystem.TYPE.PLANT;
-      mockCore.state[index] = testCase.state;
-      mockCore.energy[index] = 100;
+      // Set up a plant pixel
+      const plantIndex = mockCore.getIndex(25, 25);
+      mockCore.type[plantIndex] = PlantSystem.TYPE.PLANT;
+      mockCore.state[plantIndex] = PlantSystem.STATE.STEM;
+      mockCore.energy[plantIndex] = 100;
       
-      // Create a Set to track next active pixels
-      const nextActivePixels = new Set();
+      // Set random value for this scenario
+      Math.random = jest.fn().mockReturnValue(scenario.randomValue);
       
-      // Call the function
-      PlantSystem.updateSinglePlant(20, 20, index, nextActivePixels);
+      // Call updateSinglePlant
+      PlantSystem.updateSinglePlant(plantIndex);
       
-      // Verify that the pixel was marked as processed
-      expect(mockBiology.processedThisFrame[index]).toBe(1);
+      // Verify energy change
+      expect(mockCore.energy[plantIndex]).toBe(100 + scenario.expectedEnergyChange);
       
-      // Verify that the appropriate subsystem update function was called
-      expect(testCase.updateFn).toHaveBeenCalledWith(20, 20, index, nextActivePixels);
-      
-      // Verify that energy was decreased due to metabolism
-      expect(mockCore.energy[index]).toBeLessThan(100);
+      // Verify processed flag
+      expect(mockBiology.processedThisFrame[plantIndex]).toBe(1);
     }
+  });
+  
+  test('updateSinglePlant should handle edge cases correctly', () => {
+    // Test minimum energy
+    const minEnergyIndex = mockCore.getIndex(25, 25);
+    mockCore.type[minEnergyIndex] = PlantSystem.TYPE.PLANT;
+    mockCore.state[minEnergyIndex] = PlantSystem.STATE.STEM;
+    mockCore.energy[minEnergyIndex] = 1;
     
-    // Restore original Math.random
-    Math.random = originalRandom;
+    // Set random value to ensure energy decrease
+    Math.random = jest.fn().mockReturnValue(0.1);
+    
+    PlantSystem.updateSinglePlant(minEnergyIndex);
+    
+    // Verify plant dies when energy reaches 0
+    expect(mockCore.energy[minEnergyIndex]).toBe(0);
+    expect(mockCore.type[minEnergyIndex]).toBe(PlantSystem.TYPE.DEAD_MATTER);
+    
+    // Test maximum energy
+    const maxEnergyIndex = mockCore.getIndex(25, 26);
+    mockCore.type[maxEnergyIndex] = PlantSystem.TYPE.PLANT;
+    mockCore.state[maxEnergyIndex] = PlantSystem.STATE.STEM;
+    mockCore.energy[maxEnergyIndex] = 254; // Near maximum
+    
+    // Set random value to ensure energy increase
+    Math.random = jest.fn().mockReturnValue(0.9);
+    
+    PlantSystem.updateSinglePlant(maxEnergyIndex);
+    
+    // Verify energy is capped
+    expect(mockCore.energy[maxEnergyIndex]).toBeLessThanOrEqual(255);
   });
   
   test('detachPlantPart should convert plant to dead matter', () => {
