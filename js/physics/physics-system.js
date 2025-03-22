@@ -27,8 +27,28 @@ const PhysicsSystem = {
 
     // Initialize physics system
     init: function(core) {
-        this.core = core;
         console.log("Initializing physics systems...");
+        
+        // Validate core object
+        if (!core) {
+            console.error("Physics system init failed: core object is missing");
+            return null;
+        }
+        
+        if (!core.getCoords || !core.getIndex) {
+            console.error("Physics system init failed: core object missing required methods");
+            console.error("Core methods available:", Object.keys(core).filter(k => typeof core[k] === 'function'));
+            return null;
+        }
+        
+        if (!core.size || !core.width || !core.height) {
+            console.error("Physics system init failed: core dimensions not available", 
+                         core.width, core.height, core.size);
+            return null;
+        }
+        
+        this.core = core;
+        console.log(`Physics system using core with dimensions: ${core.width}x${core.height}`);
 
         // Create processed flags array
         this.processedThisFrame = new Uint8Array(core.size);

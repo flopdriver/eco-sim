@@ -13,6 +13,9 @@ window.PlantLeafSystem = {
     
     // Update leaf behavior
     updateLeaf: function(x, y, index, nextActivePixels) {
+        // Ensure nextActivePixels exists even if not provided (for testing)
+        nextActivePixels = nextActivePixels || new Set();
+        
         // Check for adequate water for photosynthesis
         const hasAdequateWater = this.plant.core.water[index] > 15;
         

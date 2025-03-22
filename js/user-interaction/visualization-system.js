@@ -16,7 +16,18 @@ window.VisualizationSystem = {
     // Initialize visualization system
     init: function(userInteractionSystem) {
         console.log("Initializing visualization system...");
+        
+        if (!userInteractionSystem) {
+            console.error("Error: userInteractionSystem is null or undefined");
+            return this;
+        }
+        
         this.userInteraction = userInteractionSystem;
+        
+        if (!userInteractionSystem.core) {
+            console.warn("Warning: userInteractionSystem.core is null or undefined");
+        }
+        
         return this;
     },
 

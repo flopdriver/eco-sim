@@ -39,8 +39,9 @@ window.UserInteractionSystem = {
     STATE: null,
 
     // Initialize user interaction system
-    init: function(core, canvas) {
-        this.core = core;
+    init: function(controller, canvas) {
+        // Extract core from the controller
+        this.core = controller.core;
         this.canvas = canvas;
         console.log("Initializing user interaction system...");
 

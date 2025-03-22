@@ -46,7 +46,19 @@ window.ToolSystem = {
     // Initialize tool system
     init: function(userInteractionSystem) {
         console.log("Initializing tool system...");
+        
+        if (!userInteractionSystem) {
+            console.error("Error: userInteractionSystem is null or undefined");
+            return this;
+        }
+        
         this.userInteraction = userInteractionSystem;
+        
+        if (!userInteractionSystem.core) {
+            console.error("Error: userInteractionSystem.core is null or undefined");
+            return this;
+        }
+        
         this.core = userInteractionSystem.core;
         this.TYPE = userInteractionSystem.TYPE;
         this.STATE = userInteractionSystem.STATE;
@@ -61,6 +73,12 @@ window.ToolSystem = {
 
     // Apply tool at position with brush size
     applyTool: function(tool, x, y) {
+        // Check if core exists and has getIndex method
+        if (!this.core || typeof this.core.getIndex !== 'function') {
+            console.error("Error: core object or getIndex method is missing");
+            return;
+        }
+        
         // Apply in a circular area based on brush size
         const brushSize = this.userInteraction.brushSize;
         for (let dy = -brushSize; dy <= brushSize; dy++) {

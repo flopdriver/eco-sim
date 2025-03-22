@@ -31,21 +31,33 @@ window.WebGLRendererCore = {
     panY: 0,
 
     // Initialize WebGL renderer
-    init: function(core, canvasId) {
+    init: function(core, canvas) {
         this.core = core;
         console.log("Initializing WebGL renderer core...");
 
-        // Set up canvas and WebGL context
-        this.canvas = document.getElementById(canvasId);
-        if (!this.canvas) {
-            console.error('Canvas element not found:', canvasId);
+        // Check if we have a valid canvas
+        if (!canvas || !(canvas instanceof HTMLCanvasElement)) {
+            console.error('Invalid canvas element provided:', canvas);
             return null;
         }
-
+        
+        this.canvas = canvas;
+        
+        // Check if core dimensions are valid
+        if (!core || !core.width || !core.height) {
+            console.error('Invalid core dimensions:', core ? `${core.width}x${core.height}` : 'core not defined');
+            return null;
+        }
+        
+        // Make sure pixelSize is defined
+        const pixelSize = core.pixelSize || 1;
+        
         // Set canvas size to match the simulation size precisely
         // This ensures exact 1:1 mapping of simulation pixels to render pixels
-        this.canvas.width = core.width * core.pixelSize;
-        this.canvas.height = core.height * core.pixelSize;
+        this.canvas.width = core.width * pixelSize;
+        this.canvas.height = core.height * pixelSize;
+        
+        console.log(`Canvas dimensions set to: ${this.canvas.width}x${this.canvas.height}`);
 
         // Store base dimensions for reference
         this.baseWidth = core.width;

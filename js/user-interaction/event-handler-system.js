@@ -143,7 +143,15 @@ window.EventHandlerSystem = {
         this.userInteraction.lastY = coords.y;
 
         // Apply tool at mouse position
-        const index = this.userInteraction.core.getIndex(coords.x, coords.y);
+        // Check if core and getIndex function exist
+        let index = -1;
+        if (this.userInteraction.core && typeof this.userInteraction.core.getIndex === 'function') {
+            index = this.userInteraction.core.getIndex(coords.x, coords.y);
+        } else {
+            console.error("Error: core.getIndex is not a function");
+            return;
+        }
+        
         this.userInteraction.toolSystem.applyTool(this.userInteraction.currentTool, coords.x, coords.y);
         
         // Check if hand tool is active and has a selection - if so, start drag

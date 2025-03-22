@@ -33,44 +33,26 @@ const EcosystemBalancer = {
 
     // Update biological rates based on current environmental conditions
     updateBiologicalRates: function() {
-        const biology = this.controller.biology;
-        const environment = this.controller.environment;
-
-        if (!biology || !environment) return;
-
-        // Calculate average temperature (simplified)
-        const tempFactor = (environment.temperature - 128) / 128; // -1 to 1 range
-
-        // Temperature affects metabolism (higher temp = higher metabolism)
-        // with optimal range and extremes being harmful
-        let tempMetabolismFactor;
-        if (tempFactor < -0.5) {
-            // Too cold - metabolism slows down dramatically
-            tempMetabolismFactor = 0.5 + tempFactor; // 0 to 0.5
-        } else if (tempFactor > 0.5) {
-            // Too hot - metabolism increases, energy consumed faster
-            tempMetabolismFactor = 1.5 + (tempFactor - 0.5); // 1.5 to 2.0
-        } else {
-            // Optimal range - normal to slightly increased metabolism
-            tempMetabolismFactor = 1.0 + tempFactor; // 0.5 to 1.5
-        }
-
-        // Day/night cycle affects growth (plants grow better during day)
-        const isDaytime = environment.dayNightCycle < 128;
-        const lightFactor = isDaytime ?
-            0.8 + (0.4 * Math.sin((environment.dayNightCycle / 128) * Math.PI)) :
-            0.3; // Reduced growth at night
-
-        // Rain frequency affects growth rates
-        const moistureFactor = 0.7 + (environment.rainProbability * 300);
-
-        // Apply all factors with environmental influence settings
-        biology.metabolism = tempMetabolismFactor * this.environmentalInfluence.temperatureEffect;
-        biology.growthRate = lightFactor * moistureFactor * this.environmentalInfluence.lightEfficiency;
-        biology.reproduction = moistureFactor * this.environmentalInfluence.moistureSensitivity;
-
-        // Log changes for debugging
-        console.log(`Updated biological rates - Metabolism: ${biology.metabolism.toFixed(2)}, Growth: ${biology.growthRate.toFixed(2)}, Reproduction: ${biology.reproduction.toFixed(2)}`);
+        // Calculate temperature effect
+        const tempFactor = (this.controller.environment.temperature - 128) / 128;
+        const temperatureEffect = 1.0 + (tempFactor * this.environmentalInfluence.temperatureEffect);
+        
+        // Calculate day/night cycle effect
+        const isDaytime = this.controller.environment.dayNightCycle < 128;
+        const lightEffect = isDaytime ? 1.2 : 0.8;
+        
+        // Calculate moisture effect based on rain probability
+        const moistureEffect = 1.0 + (this.controller.environment.rainProbability * 0.5);
+        
+        // Apply effects to biological rates
+        this.controller.biology.metabolism *= temperatureEffect;
+        this.controller.biology.growthRate *= (temperatureEffect * lightEffect * moistureEffect);
+        this.controller.biology.reproduction *= moistureEffect;
+        
+        // Ensure rates stay within reasonable bounds
+        this.controller.biology.metabolism = Math.max(0, Math.min(2.0, this.controller.biology.metabolism));
+        this.controller.biology.growthRate = Math.max(0, Math.min(2.0, this.controller.biology.growthRate));
+        this.controller.biology.reproduction = Math.max(0, Math.min(2.0, this.controller.biology.reproduction));
     },
 
     // Check ecosystem balance and apply corrections if needed
@@ -150,3 +132,8 @@ const EcosystemBalancer = {
         }
     }
 };
+
+// Export the balancer - make it work in both browser and Node.js environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = EcosystemBalancer;
+}
