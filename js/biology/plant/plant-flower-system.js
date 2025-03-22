@@ -69,6 +69,9 @@ window.PlantFlowerSystem = {
     
     // Update flower behavior
     updateFlower: function(x, y, index, nextActivePixels) {
+        // Ensure nextActivePixels exists even if not provided (for testing)
+        nextActivePixels = nextActivePixels || new Set();
+        
         // First check if this is a flower center or petal
         const isFlowerCenter = this.isFlowerCenter(x, y, index);
         

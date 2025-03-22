@@ -2,10 +2,26 @@
 describe('SystemManager', () => {
     let mockController;
     let SystemManager;
+    let CoreSimulation;
     
     beforeEach(() => {
-        // Reset modules
-        jest.resetModules();
+        // Reset all mocks
+        jest.clearAllMocks();
+        
+        // Mock CoreSimulation
+        CoreSimulation.init.mockImplementation(() => ({
+            TYPE: { WATER: 1, SOIL: 2 },
+            STATE: { LIQUID: 1, SOLID: 2 }
+        }));
+        
+        // Mock controller
+        mockController = {
+            core: null,
+            environment: {
+                init: jest.fn().mockReturnThis(),
+                initializeEnvironment: jest.fn().mockReturnValue(true)
+            }
+        };
         
         // Mock console
         global.console = { log: jest.fn(), error: jest.fn() };
@@ -38,11 +54,6 @@ describe('SystemManager', () => {
             biology: null,
             rendering: null,
             userInteraction: null
-        };
-        
-        // Mock CoreSimulation
-        const CoreSimulation = {
-            init: jest.fn().mockReturnThis()
         };
         
         // Mock EnvironmentController
@@ -78,9 +89,6 @@ describe('SystemManager', () => {
             STATE: null,
             core: null
         };
-        
-        // Load the SystemManager module
-        SystemManager = require('../../../js/sim-control/system-manager.js');
     });
     
     // Test initialization
@@ -171,7 +179,6 @@ describe('SystemManager', () => {
         const manager = SystemManager.init(mockController);
         
         // Mock CoreSimulation.init to return null
-        const CoreSimulation = require('../../../js/core-simulation.js');
         CoreSimulation.init.mockReturnValue(null);
         
         const result = manager.initializeSystems('test-canvas');

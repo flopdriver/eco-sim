@@ -2,10 +2,11 @@
 const EnvironmentInitializer = {
     // Reference to main controller
     controller: null,
+    // Set of active pixels that need updating
+    activePixels: new Set(),
 
     // Initialize environment initializer
-    init: function(controller) {
-        console.log("Initializing environment initializer...");
+    init(controller) {
         this.controller = controller;
         return this;
     },
@@ -38,10 +39,10 @@ const EnvironmentInitializer = {
             const detailVariation = Math.sin(x * (frequency * 4)) * (terrainVariation * 0.1) +
                 Math.sin(x * (frequency * 8)) * (terrainVariation * 0.1);
 
-            // Random additional noise for more natural feel
-            const randomNoise = (Math.random() * terrainVariation * 0.2) - (terrainVariation * 0.5);
+            // Deterministic noise for more natural feel
+            const deterministicNoise = Math.sin(x * 0.1) * (terrainVariation * 0.2);
 
-            return mainHill + detailVariation + randomNoise;
+            return mainHill + detailVariation + deterministicNoise;
         });
 
         // Smooth the terrain noise with a wider kernel
@@ -155,7 +156,7 @@ const EnvironmentInitializer = {
                 // Add water content based on soil type and depth
                 
                 // Base water content increases with depth
-                const baseWaterContent = Math.floor(depth * 150 * (0.8 + Math.random() * 0.4));
+                const baseWaterContent = Math.floor(depth * 150);
                 
                 // Adjust water content based on soil type
                 let waterMultiplier = 1.0;
@@ -183,8 +184,9 @@ const EnvironmentInitializer = {
                         break;
                 }
                 
-                // Calculate final water content
-                core.water[index] = Math.floor(baseWaterContent * waterMultiplier);
+                // Calculate final water content with deterministic variation
+                const deterministicNoise = Math.sin(x * 0.1 + y * 0.1) * 0.2 + 0.8; // 0.6-1.0 range
+                core.water[index] = Math.floor(baseWaterContent * waterMultiplier * deterministicNoise);
                 
                 // Update WET/DRY state for non-layer-type soil
                 if (soilState === STATE.DEFAULT || soilState === STATE.FERTILE) {
@@ -229,7 +231,7 @@ const EnvironmentInitializer = {
                 }
 
                 // Mark as active for first update
-                activePixels.add(index);
+                this.activePixels.add(index);
             }
         }
 
@@ -317,4 +319,9 @@ const EnvironmentInitializer = {
             }
         }
     }
-};
+}
+
+// Export the initializer - make it work in both browser and Node.js environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = EnvironmentInitializer;
+}

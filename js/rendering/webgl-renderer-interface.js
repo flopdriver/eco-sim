@@ -13,8 +13,17 @@ window.WebGLRenderingSystem = {
     STATE: null,
 
     // Initialize the rendering system
-    init: function(core, canvasId) {
+    init: function(core, canvas) {
         console.log("Initializing WebGL rendering system...");
+        
+        // Verify core dimensions are available
+        if (!core || !core.width || !core.height) {
+            console.error("WebGL rendering system init failed: core dimensions not available", 
+                         core ? `${core.width}x${core.height}` : "core not provided");
+            return null;
+        }
+        
+        console.log(`WebGL system initializing with core dimensions: ${core.width}x${core.height}`);
 
         // Store references to type and state enums
         this.TYPE = core.TYPE;
@@ -35,7 +44,7 @@ window.WebGLRenderingSystem = {
         }
 
         // Initialize renderer core (depends on all other modules)
-        this.rendererCore = WebGLRendererCore.init(core, canvasId);
+        this.rendererCore = WebGLRendererCore.init(core, canvas);
         if (!this.rendererCore) {
             console.error("Failed to initialize WebGL renderer core");
             return null;

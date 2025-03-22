@@ -668,6 +668,9 @@ window.PlantSystem = {
         // Mark as processed
         this.biology.processedThisFrame[index] = 1;
 
+        // Ensure nextActivePixels exists even if not provided (for testing)
+        nextActivePixels = nextActivePixels || new Set();
+
         // Get plant state
         const state = this.core.state[index];
 

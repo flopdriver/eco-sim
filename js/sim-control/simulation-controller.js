@@ -35,19 +35,28 @@ const SimulationController = {
             return null;
         }
 
+        // Get the canvas element from the ID
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) {
+            console.error('Canvas element not found with ID:', canvasId);
+            return null;
+        }
+
         // Initialize active pixels set
         this.activePixels = new Set();
+        
+        // Set up constants first to ensure they're available to all subsystems
+        this.initializeConstants();
 
         // Initialize all module managers
         this.systemManager = SystemManager.init(this);
 
         // Initialize all systems through system manager
-        if (!this.systemManager.initializeSystems(canvasId)) {
+        if (!this.systemManager.initializeSystems(canvas)) {
             return null;
         }
 
-        // Set up constants and propagate to subsystems
-        this.initializeConstants();
+        // Propagate constants to subsystems
         this.systemManager.propagateConstants();
 
         // Initialize other manager modules with required references
@@ -108,7 +117,10 @@ const SimulationController = {
         console.log("Starting simulation...");
         this.running = true;
         this.performanceManager.resetTiming();
-        requestAnimationFrame(() => this.update());
+        // Only start animation frame if speed is positive
+        if (this.simulationSpeed > 0) {
+            requestAnimationFrame(() => this.update());
+        }
     },
 
     // Stop the simulation
@@ -121,10 +133,8 @@ const SimulationController = {
     togglePause: function() {
         if (this.running) {
             this.stop();
-            document.getElementById('pause-button').textContent = 'Resume';
         } else {
             this.start();
-            document.getElementById('pause-button').textContent = 'Pause';
         }
     },
 
@@ -142,7 +152,7 @@ const SimulationController = {
         this.core.metadata.fill(0);
 
         // Clear active pixels
-        this.activePixels.clear();
+        this.activePixels = new Set();
 
         // Re-initialize environment
         this.environmentInitializer.initializeEnvironment();
@@ -150,8 +160,7 @@ const SimulationController = {
         // Reset environmental-biological connections
         this.ecosystemBalancer.initializeEnvironmentalConnections();
 
-        // Restart simulation
-        this.start();
+        // Don't automatically start the simulation after reset
     },
 
     // Main update loop
@@ -165,9 +174,9 @@ const SimulationController = {
         const nextActivePixels = new Set();
 
         // Run multiple update steps based on speed setting
-        for (let i = 0; i < this.simulationSpeed; i++) {
+        for (let i = 0; i < this.simulationSpeed && this.running; i++) {
             // Periodically update environmental-biological connections
-            if (i === 0 && Math.random() < 0.05) {
+            if (i === 0 && Math.random() < 0.01) {
                 this.ecosystemBalancer.updateBiologicalRates();
             }
 
@@ -193,21 +202,42 @@ const SimulationController = {
         // Render
         this.rendering.render();
 
-        // Schedule next update
-        if (this.running) {
+        // Schedule next update only if still running
+        if (this.running && this.simulationSpeed > 0) {
             requestAnimationFrame(() => this.update());
         }
     }
 };
 
+// Export the controller - make it work in both browser and Node.js environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SimulationController;
+}
+
 // Initialize and start the simulation when the page loads
-window.onload = function() {
+document.addEventListener('DOMContentLoaded', function() {
     // Check WebGL support first
     if (!WebGLUtils.isWebGLSupported()) {
         alert('WebGL is not supported in your browser. This simulation requires WebGL.');
         return;
     }
 
+    // Make sure the canvas exists and has dimensions
+    const canvas = document.getElementById('ecosystem-canvas');
+    if (!canvas) {
+        console.error('Canvas element not found with ID: ecosystem-canvas');
+        return;
+    }
+
+    // Ensure the canvas has proper dimensions
+    if (canvas.width === 0 || canvas.height === 0) {
+        // Set default dimensions if not specified in CSS
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        console.log('Set canvas dimensions:', canvas.width, 'x', canvas.height);
+    }
+
+    // Initialize simulation with the verified canvas
     const simulation = SimulationController.init('ecosystem-canvas');
     if (simulation) {
         simulation.start();
@@ -215,4 +245,4 @@ window.onload = function() {
         // Make simulation globally accessible for debugging
         window.ecosim = simulation;
     }
-};
+});

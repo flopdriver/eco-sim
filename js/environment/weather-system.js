@@ -47,6 +47,23 @@ const WeatherSystem = {
 
     // Initialize weather system
     init: function(environmentController) {
+        console.log("Initializing weather system...");
+        
+        if (!environmentController) {
+            console.error("Weather system init failed: environment controller is missing");
+            return null;
+        }
+        
+        if (!environmentController.core) {
+            console.error("Weather system init failed: core object is missing from environment controller");
+            return null;
+        }
+        
+        if (!environmentController.core.getIndex) {
+            console.error("Weather system init failed: core object missing getIndex method");
+            return null;
+        }
+        
         this.environment = environmentController;
 
         // Set maximum cloud width based on simulation width
@@ -55,8 +72,6 @@ const WeatherSystem = {
         // Initialize with random weather pattern
         this.setRandomWeatherPattern();
         
-        console.log("Initializing weather system...");
-
         // Initialize clouds and sky
         this.createInitialClouds();
 
@@ -67,11 +82,17 @@ const WeatherSystem = {
     createInitialClouds: function() {
         const core = this.environment.core;
         
+        // Ensure core is valid
+        if (!core || !core.getIndex) {
+            console.error("Cannot create clouds: Invalid core object");
+            return;
+        }
+        
         // Base cloud color
         const baseCloudColor = {
             r: 240,
             g: 240,
-            b: 250
+            b: 255
         };
         this.cloudProperties.cloudColor = baseCloudColor;
         

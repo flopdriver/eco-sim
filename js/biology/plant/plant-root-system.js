@@ -36,6 +36,9 @@ window.PlantRootSystem = {
 
     // Update root behavior
     updateRoot: function(x, y, index, nextActivePixels) {
+        // Ensure nextActivePixels exists even if not provided (for testing)
+        nextActivePixels = nextActivePixels || new Set();
+        
         // Roots absorb water and nutrients from surrounding soil
         this.absorbWaterAndNutrients(x, y, index, nextActivePixels);
 

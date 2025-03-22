@@ -25,8 +25,20 @@ window.EnvironmentController = {
 
     // Initialize environment system
     init: function(core) {
-        this.core = core;
         console.log("Initializing environment systems...");
+        
+        if (!core) {
+            console.error("Environment controller init failed: core object is missing");
+            return null;
+        }
+        
+        if (!core.getIndex) {
+            console.error("Environment controller init failed: core object missing getIndex method");
+            return null;
+        }
+        
+        this.core = core;
+        console.log(`Environment controller using core with dimensions: ${core.width}x${core.height}`);
 
         // Initialize subsystems
         this.dayNightSystem = DayNightSystem.init(this);

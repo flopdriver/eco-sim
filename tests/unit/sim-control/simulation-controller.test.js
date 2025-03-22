@@ -1,19 +1,62 @@
 // Simulation Controller Tests
-describe('SimulationController', () => {
-    let mockCore;
-    let mockEnvironment;
-    let mockPhysics;
-    let mockBiology;
-    let mockRendering;
-    let mockUserInteraction;
-    let SimulationController;
 
+// Set up module mocks manually
+jest.mock('../../../js/core-simulation', () => ({ 
+    init: jest.fn(() => mockCore) 
+}), { virtual: true });
+
+jest.mock('../../../js/environment/environment-controller', () => ({ 
+    init: jest.fn(() => mockEnvironment) 
+}), { virtual: true });
+
+jest.mock('../../../js/physics/physics-system', () => ({ 
+    init: jest.fn(() => mockPhysics) 
+}), { virtual: true });
+
+jest.mock('../../../js/biology/biology-system', () => ({ 
+    init: jest.fn(() => mockBiology) 
+}), { virtual: true });
+
+jest.mock('../../../js/rendering/webgl-rendering-system', () => ({ 
+    init: jest.fn(() => mockRendering) 
+}), { virtual: true });
+
+jest.mock('../../../js/user-interaction/user-interaction-system', () => ({ 
+    init: jest.fn(() => mockUserInteraction) 
+}), { virtual: true });
+
+jest.mock('../../../js/sim-control/ecosystem-balancer', () => ({ 
+    init: jest.fn(() => mockEcosystemBalancer) 
+}), { virtual: true });
+
+jest.mock('../../../js/sim-control/system-manager', () => ({
+    init: jest.fn().mockReturnThis(),
+    initializeSystems: jest.fn().mockReturnValue(true),
+    propagateConstants: jest.fn().mockReturnValue(true)
+}), { virtual: true });
+
+// Define mocks globally to be available for the mocked modules
+let mockCore;
+let mockEnvironment;
+let mockPhysics;
+let mockBiology;
+let mockRendering;
+let mockUserInteraction;
+let mockEcosystemBalancer;
+let mockEnvironmentInitializer;
+
+describe('SimulationController', () => {
+    let SimulationController;
+    
     beforeEach(() => {
-        // Reset modules
-        jest.resetModules();
+        // Reset all mocks
+        jest.clearAllMocks();
         
-        // Mock console
-        global.console = { log: jest.fn() };
+        // Mock environment initializer
+        mockEnvironmentInitializer = {
+            init: jest.fn().mockReturnThis(),
+            initializeEnvironment: jest.fn().mockReturnValue(true)
+        };
         
         // Mock WebGLUtils
         global.WebGLUtils = {
@@ -73,52 +116,28 @@ describe('SimulationController', () => {
         // Mock user interaction system
         mockUserInteraction = {
             init: jest.fn().mockReturnThis(),
+            update: jest.fn(),
             TYPE: {},
             STATE: {},
             propagateConstants: jest.fn()
         };
         
-        // Mock system manager
-        const SystemManager = {
-            init: jest.fn().mockReturnThis(),
-            initializeSystems: jest.fn().mockReturnValue(true),
-            propagateConstants: jest.fn().mockReturnValue(true)
-        };
-        
-        // Mock environment initializer
-        const EnvironmentInitializer = {
-            init: jest.fn().mockReturnThis(),
-            initializeEnvironment: jest.fn()
-        };
-        
-        // Mock performance manager
-        const PerformanceManager = {
-            init: jest.fn().mockReturnThis(),
-            startFrame: jest.fn(),
-            endFrame: jest.fn(),
-            manageActivePixels: jest.fn(),
-            resetTiming: jest.fn()
-        };
-        
-        // Mock UI manager
-        const UIManager = {
-            init: jest.fn().mockReturnThis(),
-            setupUI: jest.fn(),
-            updateStats: jest.fn()
-        };
-        
         // Mock ecosystem balancer
-        const EcosystemBalancer = {
+        mockEcosystemBalancer = {
             init: jest.fn().mockReturnThis(),
-            initializeEnvironmentalConnections: jest.fn(),
-            updateBiologicalRates: jest.fn()
+            balanceEcosystem: jest.fn()
         };
+        
+        // Mock console
+        global.console = { log: jest.fn(), error: jest.fn() };
         
         // Mock requestAnimationFrame
         global.requestAnimationFrame = jest.fn(callback => setTimeout(callback, 0));
         
-        // Load the SimulationController module
-        SimulationController = require('../../../js/sim-control/simulation-controller.js');
+        jest.mock('../../../js/sim-control/environment-initializer', () => mockEnvironmentInitializer, { virtual: true });
+        
+        // Import simulation controller after all mocks are set up
+        SimulationController = require('../../../js/sim-control/simulation-controller');
     });
 
     // Test initialization

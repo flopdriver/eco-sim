@@ -28,6 +28,8 @@ window.PlantStemSystem = {
     
     // Update stem behavior
     updateStem: function(x, y, index, nextActivePixels) {
+        // Ensure nextActivePixels exists even if not provided (for testing)
+        nextActivePixels = nextActivePixels || new Set();
 
         // Get the plant group ID to determine species and track trunk development
         const plantGroupId = this.plant.plantGroups[index];

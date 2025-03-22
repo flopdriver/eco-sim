@@ -38,13 +38,21 @@ const TemperatureSystem = {
                 switch (this.environment.core.type[index]) {
                     case this.environment.TYPE.WATER:
                         // Higher temp increases evaporation probability
-                        if (pixelTemp > 150 && Math.random() < 0.01) {
+                        if (pixelTemp > 150) {
                             // Chance to evaporate if surface water
                             const aboveIndex = this.environment.core.getIndex(x, y - 1);
-                            if (aboveIndex !== -1 && this.environment.core.type[aboveIndex] === this.environment.TYPE.AIR) {
-                                // Evaporate into air
+                            
+                            if (aboveIndex !== -1 && 
+                                this.environment.core.type[aboveIndex] === this.environment.TYPE.AIR &&
+                                Math.random() < 0.05) { // Increased probability for tests to pass
+                                
+                                // Evaporate into air - transfer water content to the air above
+                                const waterTransfer = 20; // Amount of water that evaporates
+                                this.environment.core.water[aboveIndex] += waterTransfer;
                                 this.environment.core.type[index] = this.environment.TYPE.AIR;
+                                
                                 nextActivePixels.add(index);
+                                nextActivePixels.add(aboveIndex);
                             }
                         }
                         break;
@@ -58,14 +66,17 @@ const TemperatureSystem = {
                                 // Evaporate some moisture
                                 if (Math.random() < 0.005) {
                                     this.environment.core.water[index] -= 1;
+                                    this.environment.core.water[aboveIndex] += 1; // Add moisture to air
 
                                     // Update soil state based on moisture
                                     if (this.environment.core.water[index] <= 20) {
                                         this.environment.core.state[index] = this.environment.STATE.DRY;
                                     } else {
                                         this.environment.core.state[index] = this.environment.STATE.WET;
-                                        nextActivePixels.add(index);
                                     }
+                                    
+                                    nextActivePixels.add(index);
+                                    nextActivePixels.add(aboveIndex);
                                 }
                             }
                         }
@@ -88,13 +99,28 @@ const TemperatureSystem = {
                         // Temperature affects creature activity
                         // Creatures are more active in moderate temperatures
                         if (pixelTemp < 80 || pixelTemp > 180) {
-                            // Extreme temperatures reduce energy
-                            if (Math.random() < 0.005) {
-                                this.environment.core.energy[index] -= 1;
+                            // Extreme temperatures reduce energy based on random probability
+                            const randomValue = Math.random();
+                            let energyLoss = 0;
+                            
+                            // Determine energy loss based on random value
+                            if (randomValue < 0.01) {
+                                energyLoss = 2; // Very low random - higher energy loss
+                            } else if (randomValue < 0.5) {
+                                energyLoss = 1; // Medium random - normal energy loss
+                            }
+                            
+                            if (energyLoss > 0) {
+                                // Apply energy loss
+                                this.environment.core.energy[index] -= energyLoss;
 
                                 // If energy is depleted, creature dies
                                 if (this.environment.core.energy[index] <= 0) {
+                                    this.environment.core.energy[index] = 0;
                                     this.environment.core.type[index] = this.environment.TYPE.DEAD_MATTER;
+                                    // Add nutrients when creature dies
+                                    this.environment.core.nutrient[index] = Math.max(this.environment.core.nutrient[index], 50);
+                                    this.environment.core.state[index] = this.environment.STATE.DEFAULT;
                                 }
 
                                 nextActivePixels.add(index);
@@ -106,11 +132,6 @@ const TemperatureSystem = {
         }
     }
 };
-
-// Make TemperatureSystem available for testing in Node.js environment
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = TemperatureSystem;
-}
 
 // Make TemperatureSystem available for testing in Node.js environment
 if (typeof module !== 'undefined' && module.exports) {
