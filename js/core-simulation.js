@@ -246,6 +246,26 @@ const CoreSimulation = {
         return this.getDefaultSoilHeight();
     },
 
+    // Determine if a position is at the soil-air boundary
+    isAtSoilAirBoundary: function(x, y, frameCount) {
+        // Get the soil height at this x-coordinate
+        const soilHeight = this.getSoilHeight(x, frameCount);
+        
+        // Check if this position is exactly at the soil line
+        return y === soilHeight;
+    },
+    
+    // Check if a position is above, at, or below the soil line
+    // Returns: -1 (above soil line), 0 (at soil line), 1 (below soil line)
+    getSoilLinePosition: function(x, y, frameCount) {
+        // Get the soil height at this x-coordinate
+        const soilHeight = this.getSoilHeight(x, frameCount);
+        
+        if (y < soilHeight) return -1; // Above soil line
+        if (y === soilHeight) return 0; // At soil line
+        return 1; // Below soil line
+    },
+
     // Update soil line heights
     updateSoilLineHeights: function(frameCount) {
         // Only update periodically to save performance

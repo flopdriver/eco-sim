@@ -106,6 +106,16 @@ const UIManager = {
             this.controller.userInteraction.brushSize = value;
             return value + 'px';
         });
+        
+        // Fixed time step toggle
+        const fixedTimeStepToggle = document.getElementById('fixed-time-step-toggle');
+        if (fixedTimeStepToggle) {
+            fixedTimeStepToggle.checked = this.controller.fixedTimeStepEnabled;
+            fixedTimeStepToggle.addEventListener('change', (e) => {
+                this.controller.fixedTimeStepEnabled = e.target.checked;
+                console.log(`Fixed time step mode: ${this.controller.fixedTimeStepEnabled ? 'enabled' : 'disabled'}`);
+            });
+        }
 
         // Tool buttons
         const toolButtons = document.querySelectorAll('.tool-button');

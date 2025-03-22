@@ -253,7 +253,26 @@ canvas {
 }
 
 .slider-control.mini.horizontal input {
-    width: 50px;
+    width: 60px;
+    margin: 0 var(--spacing-xs);
+}
+
+/* Toggle control styles */
+.toggle-control.mini {
+    display: flex;
+    align-items: center;
+    margin-left: 10px;
+    font-size: var(--font-size-xs);
+    color: var(--color-light);
+}
+
+.toggle-control.mini label {
+    margin-right: 8px;
+    cursor: pointer;
+}
+
+.toggle-control.mini input[type="checkbox"] {
+    cursor: pointer;
 }
 
 /* Sim controls mini */
@@ -531,6 +550,7 @@ input[type=range].mini-slider::-webkit-slider-thumb {
     box-shadow: 0 0 8px rgba(52, 152, 219, 0.6);
     z-index: 40;
     display: none;
+    animation: highlight-pulse 1.5s infinite;
 }
 
 /* Selection tooltip */
@@ -545,6 +565,7 @@ input[type=range].mini-slider::-webkit-slider-thumb {
     z-index: 100;
     display: none;
     white-space: nowrap;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 /* Entity info panel */

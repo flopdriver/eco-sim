@@ -17,6 +17,9 @@ const PhysicsSystem = {
 
     // Processing flags to avoid double updates
     processedThisFrame: null,
+    
+    // Frame counter for timing operations
+    frameCount: 0,
 
     // Subsystem references
     fluidDynamicsSystem: null,
@@ -68,6 +71,9 @@ const PhysicsSystem = {
         // Reset processed flags
         this.processedThisFrame.fill(0);
         
+        // Increment frame counter
+        this.frameCount++;
+        
         // Process seed scattering (added for increased seed dispersal)
         this.scatterSeeds(activePixels, nextActivePixels);
 
@@ -75,6 +81,9 @@ const PhysicsSystem = {
         if (this.fluidDynamics) {
             this.fluidDynamicsSystem.updateWaterMovement(activePixels, nextActivePixels);
         }
+
+        // Ensure key soil pixels are always active
+        this.activateImportantSoilPixels(activePixels);
 
         // Process soil moisture movement
         this.soilMoistureSystem.updateSoilMoisture(activePixels, nextActivePixels);
@@ -138,6 +147,31 @@ const PhysicsSystem = {
         }
     },
     
+    // Ensure key soil areas are active for processing
+    activateImportantSoilPixels: function(activePixels) {
+        // Every 5th frame, activate soil near plant roots and water
+        if (this.frameCount % 5 === 0) {
+            for (const index of activePixels) {
+                // If this is a plant root or water, activate nearby soil
+                if ((this.core.type[index] === this.TYPE.PLANT && 
+                     this.core.state[index] === this.STATE.ROOT) ||
+                    this.core.type[index] === this.TYPE.WATER) {
+                    
+                    // Get coordinates and neighbors
+                    const coords = this.core.getCoords(index);
+                    const neighbors = this.core.getNeighborIndices(coords.x, coords.y);
+                    
+                    // Activate soil neighbors
+                    for (const neighbor of neighbors) {
+                        if (this.core.type[neighbor.index] === this.TYPE.SOIL) {
+                            activePixels.add(neighbor.index);
+                        }
+                    }
+                }
+            }
+        }
+    },
+
     // Dramatically enhanced seed scattering for aggressive Jumanji-like propagation
     scatterSeeds: function(activePixels, nextActivePixels) {
         // Find all seeds and flowers that can scatter seeds

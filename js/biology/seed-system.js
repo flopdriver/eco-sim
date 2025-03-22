@@ -59,10 +59,10 @@ const SeedSystem = {
 
         // Case 1: Seed is on top of soil
         if (downIndex !== -1 && downLocation === this.TYPE.SOIL) {
-            // More generous water requirement for germination
-            if (this.core.water[downIndex] > 25) { // Reduced from 50 to 25
+            // FIXED: More generous water requirement for germination - reduced from 25 to 10
+            if (this.core.water[downIndex] > 10) { // Reduced from 25 to 10
                 // Base germination chance
-                let germinationChance = 0.45 * this.biology.growthRate; // Massively increased from 0.25 to 0.45
+                let germinationChance = 0.65 * this.biology.growthRate; // Increased from 0.45 to 0.65
                 
                 // Fire-adapted seeds in recently burned areas get a boost
                 if (isFireAdapted && recentlyBurned) {
@@ -76,12 +76,12 @@ const SeedSystem = {
                     this.core.state[index] = this.STATE.ROOT;
 
                     // Initial root has more water and energy
-                    this.core.water[index] = 80; // Increased from 50
+                    this.core.water[index] = 100; // Increased from 80 to 100
                     
                     // Fire-adapted plants in burned areas start with more energy
-                    let initialEnergy = 150;
+                    let initialEnergy = 200; // Increased from 150 to 200
                     if (isFireAdapted && recentlyBurned) {
-                        initialEnergy = 250; // Extra energy for fire-adapted plants in burned areas
+                        initialEnergy = 300; // Increased from 250 to 300
                     }
                     this.core.energy[index] = Math.max(this.core.energy[index], initialEnergy);
                     
@@ -115,10 +115,10 @@ const SeedSystem = {
             // Get soil depth
             const soilDepth = this.getSoilDepth(x, y);
             
-            // Higher germination chance when buried in soil with water
-            if (surroundingWater > 20) { // Reduced from 30 to 20
+            // FIXED: Higher germination chance when buried in soil with water
+            if (surroundingWater > 10) { // Reduced from 20 to 10
                 // Base germination chance
-                let germinationChance = 0.4 * this.biology.growthRate; // Reduced from 0.55 to 0.4 for better balance
+                let germinationChance = 0.6 * this.biology.growthRate; // Increased from 0.4 to 0.6
                 
                 // Seeds too deep struggle to germinate - but still possible
                 if (soilDepth > 5) {
@@ -141,14 +141,14 @@ const SeedSystem = {
                     this.core.state[index] = this.STATE.ROOT;
 
                     // Initial root has water based on surrounding soil
-                    this.core.water[index] = Math.min(120, surroundingWater * 1.8); // Reduced from 150 to 120 and from 2 to 1.8
+                    this.core.water[index] = Math.min(150, surroundingWater * 2.0); // Increased from 120 to 150 and from 1.8 to 2.0
 
                     // Base energy for roots from buried seeds
-                    let initialEnergy = 180; // Reduced from 200 to 180
+                    let initialEnergy = 220; // Increased from 180 to 220
                     
                     // Fire-adapted plants in burned areas start with more energy
                     if (isFireAdapted && recentlyBurned) {
-                        initialEnergy = 280; // Reduced from 300 to 280
+                        initialEnergy = 320; // Increased from 280 to 320
                     }
                     
                     // Roots from buried seeds start with extra energy
@@ -175,13 +175,13 @@ const SeedSystem = {
                 }
             }
             
-            // Seeds that are too deep may decompose faster
+            // FIXED: Seeds that are too deep may decompose faster but reduced decomposition rate
             if (soilDepth > 8) {
                 // Fire-adapted seeds are more resilient to being buried deep
                 if (isFireAdapted) {
-                    this.core.energy[index] -= 0.1 * this.biology.metabolism; // Less energy loss
+                    this.core.energy[index] -= 0.05 * this.biology.metabolism; // Reduced from 0.1 to 0.05
                 } else {
-                    this.core.energy[index] -= 0.2 * this.biology.metabolism; // Regular energy loss
+                    this.core.energy[index] -= 0.1 * this.biology.metabolism; // Reduced from 0.2 to 0.1
                 }
             }
         }
@@ -195,8 +195,8 @@ const SeedSystem = {
             }
         }
 
-        // Seeds lose energy slowly
-        this.core.energy[index] -= 0.1 * this.biology.metabolism;
+        // FIXED: Seeds lose energy more slowly
+        this.core.energy[index] -= 0.05 * this.biology.metabolism; // Reduced from 0.1 to 0.05
 
         // If energy is depleted, seed dies
         if (this.core.energy[index] <= 0) {

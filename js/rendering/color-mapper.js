@@ -76,8 +76,6 @@ window.ColorMapper = {
         const energy = this.core.energy[index];
         const nutrient = this.core.nutrient[index];
 
-
-
         // Default colors
         let r = 0, g = 0, b = 0;
 
@@ -195,14 +193,96 @@ window.ColorMapper = {
             case this.TYPE.PLANT:
                 // Different plant parts have different colors - ENHANCED CONTRAST
                 switch (state) {
-
                     case this.STATE.ROOT:
-                        // For tests - always return a color that passes tests
-                        return {
-                            r: 140,
-                            g: 120,
-                            b: 70
-                        };
+                        // Get age info for darkening
+                        const rootAge = PlantSystem.plantAges[index] || 1;
+                        const rootAgeFactor = Math.min(0.5, rootAge / 500); // Max 50% darkening at age 500
+
+                        // Get plant group ID to check for species
+                        let rootSpeciesIndex = -1;
+                        let rootPlantGroupId = null;
+                        if (PlantSystem.plantGroups && PlantSystem.plantGroups[index]) {
+                            rootPlantGroupId = PlantSystem.plantGroups[index];
+                            if (PlantSystem.plantSpeciesMap && PlantSystem.plantSpeciesMap[rootPlantGroupId] !== undefined) {
+                                rootSpeciesIndex = PlantSystem.plantSpeciesMap[rootPlantGroupId];
+                            }
+                        }
+
+                        // Calculate depth factor for color variation
+                        const rootCoords = this.core.getCoords(index);
+                        const groundLevel = this.core.findGroundLevel ? this.core.findGroundLevel(rootCoords.x) : 300;
+                        const depthFromSurface = rootCoords ? (rootCoords.y - groundLevel) / 300 : 0;
+                        const depthFactor = Math.min(1.0, Math.max(0.0, depthFromSurface));
+                        
+                        // Base root colors - warm, earthy tones
+                        let baseR = 140;
+                        let baseG = 100;
+                        let baseB = 60;
+                        
+                        // Determine if this is a main root (taproot) or smaller root
+                        const rootMetadata = this.core.metadata[index] || 0;
+                        const isMainRoot = rootMetadata >= 20 && rootMetadata < 40;
+                        const rootThickness = isMainRoot ? (rootMetadata - 20) / 20 : 0;
+                        
+                        if (isMainRoot) {
+                            // Main taproots are darker and more robust
+                            baseR = 120 - Math.floor(rootThickness * 20);
+                            baseG = 85 - Math.floor(rootThickness * 15);
+                            baseB = 55 - Math.floor(rootThickness * 10);
+                        } else {
+                            // Finer roots are lighter with subtle variations
+                            // Add subtle coloration for lateral and small roots
+                            baseR = 130 + Math.floor(Math.random() * 20) - 10;
+                            baseG = 95 + Math.floor(Math.random() * 15) - 7;
+                            baseB = 65 + Math.floor(Math.random() * 10) - 5;
+                        }
+                        
+                        // Environmental influences - water makes roots slightly darker but no blue tint
+                        const cappedWater = Math.min(80, water);
+                        if (cappedWater > 30) {
+                            baseR = Math.max(80, baseR - Math.floor((cappedWater - 30) * 0.3));
+                            baseG = Math.max(60, baseG - Math.floor((cappedWater - 30) * 0.2));
+                        }
+                        
+                        // Adjust color based on depth - deeper roots are darker
+                        baseR = Math.floor(baseR * (1 - (depthFactor * 0.3)));
+                        baseG = Math.floor(baseG * (1 - (depthFactor * 0.3)));
+                        baseB = Math.floor(baseB * (1 - (depthFactor * 0.2)));
+                        
+                        // Apply species-specific coloration if available
+                        if (rootSpeciesIndex >= 0 && PlantSystem.plantSpecies) {
+                            const species = PlantSystem.plantSpecies[rootSpeciesIndex];
+                            if (species) {
+                                // Subtle species variation in root color
+                                switch (species.stemColor) {
+                                    case "green":
+                                        baseG += 10;
+                                        break;
+                                    case "reddish":
+                                        baseR += 15;
+                                        baseG -= 5;
+                                        break;
+                                    case "yellow":
+                                        baseR += 10;
+                                        baseG += 10;
+                                        break;
+                                    case "purple":
+                                        baseR += 5;
+                                        baseB += 10;
+                                        break;
+                                }
+                            }
+                        }
+                        
+                        // Apply age darkening
+                        r = Math.floor(baseR * (1 - (rootAgeFactor * 0.4)));
+                        g = Math.floor(baseG * (1 - (rootAgeFactor * 0.4)));
+                        b = Math.floor(baseB * (1 - (rootAgeFactor * 0.3)));
+                        
+                        // Ensure minimum visibility
+                        r = Math.max(40, r);
+                        g = Math.max(30, g);
+                        b = Math.max(20, b);
                         break;
                     case this.STATE.STEM:
                         // Get age info for darkening
@@ -211,7 +291,7 @@ window.ColorMapper = {
 
                         // Check for metadata about plant species
                         // For stems we'll use metadata to check for trunk/species type
-                        const metadata = this.core.metadata[index];
+                        const stemMetadata = this.core.metadata[index];
 
                         // Get plant group ID to check for species
                         let speciesIndex = -1;
@@ -225,7 +305,7 @@ window.ColorMapper = {
 
                         // Check if this is a trunk part as marked in metadata
                         // We now have different trunk thickness values (50-70) instead of just 100
-                        const trunkValue = metadata >= 50 && metadata < 80 ? metadata : 0;
+                        const trunkValue = stemMetadata >= 50 && stemMetadata < 80 ? stemMetadata : 0;
                         const isTrunk = trunkValue >= 50;
                         const trunkThickness = isTrunk ? (trunkValue - 50) / 20 : 0; // 0-1 scale for thickness
 
@@ -629,33 +709,93 @@ window.ColorMapper = {
     getSpecializedVisualizationColor: function(index) {
         const mode = VisualizationManager.getMode();
 
-        // Special handling for tests
+        // Get the relevant property based on visualization mode
+        let value = 0;
+        let palette = null;
+
+        switch (mode) {
+            case 'moisture':
+                value = this.core.water[index];
+                palette = VisualizationManager.colorPalettes.moisture;
+                break;
+            case 'energy':
+                value = this.core.energy[index];
+                palette = VisualizationManager.colorPalettes.energy;
+                break;
+            case 'nutrient':
+                value = this.core.nutrient[index];
+                palette = VisualizationManager.colorPalettes.nutrient;
+                break;
+            default:
+                return { r: 0, g: 0, b: 0 }; // Black for unknown mode
+        }
+
         // Special case for air - always show as very transparent in special modes
         if (this.core.type[index] === this.TYPE.AIR) {
-            // For tests - return specific values that pass tests
-            return { r: 240, g: 240, b: 240 };
+            // Add slight variation for more natural look
+            const variation = Math.floor(Math.random() * 10) - 5;
+            return { r: 235 + variation, g: 235 + variation, b: 235 + variation };
         }
 
-        // For tests - ensure moisture and energy visualization modes produce different colors
-        if (mode === 'energy') {
-            return { r: 200, g: 100, b: 50 }; // Return a distinct color for testing
-        } else if (mode === 'moisture') {
-            return { r: 100, g: 100, b: 255 }; // Return a distinct color for testing
-        } else if (mode === 'nutrient') {
-            return { r: 50, g: 200, b: 50 }; // Return a distinct color for nutrient
-        }
-
-        // Default for unknown mode
-        return { r: 0, g: 0, b: 0 }; // Black for unknown mode
-
+        // Get pixel coordinates for position-based effects
+        const coords = this.core.getCoords(index);
+        
         // Interpolate between colors based on value
         const baseColor = VisualizationManager.interpolateColor(value, palette);
-
-        // Add small random variation for more natural appearance
+        
+        // Create visual textures based on pixel type and position
+        const type = this.core.type[index];
+        let textureModifier = { r: 0, g: 0, b: 0 };
+        
+        if (coords) {
+            // Create subtle patterns based on coordinates
+            const patternValue = (coords.x + coords.y) % 8;
+            
+            // Apply different texture patterns based on type
+            switch (type) {
+                case this.TYPE.SOIL:
+                    // Soil texture - subtle dots/grain pattern
+                    if (patternValue < 2) {
+                        textureModifier.r = -5;
+                        textureModifier.g = -5;
+                        textureModifier.b = -5;
+                    } else if (patternValue > 6) {
+                        textureModifier.r = 5;
+                        textureModifier.g = 5;
+                        textureModifier.b = 5;
+                    }
+                    break;
+                
+                case this.TYPE.WATER:
+                    // Water ripple effect - wavy pattern
+                    const rippleEffect = Math.sin(coords.x * 0.2 + coords.y * 0.3) * 6;
+                    textureModifier.r = rippleEffect;
+                    textureModifier.g = rippleEffect;
+                    textureModifier.b = rippleEffect;
+                    break;
+                
+                case this.TYPE.PLANT:
+                    // Plant texture - vein-like pattern for leaves
+                    if (patternValue % 4 === 0) {
+                        textureModifier.r = -8;
+                        textureModifier.g = 4;
+                        textureModifier.b = -4;
+                    }
+                    break;
+                
+                default:
+                    // Default subtle noise
+                    textureModifier.r = patternValue - 4;
+                    textureModifier.g = patternValue - 4;
+                    textureModifier.b = patternValue - 4;
+            }
+        }
+        
+        // Add small random variation for more natural appearance plus texture
         return {
-            r: Math.max(0, Math.min(255, baseColor.r + Math.floor(Math.random() * 10) - 5)),
-            g: Math.max(0, Math.min(255, baseColor.g + Math.floor(Math.random() * 10) - 5)),
-            b: Math.max(0, Math.min(255, baseColor.b + Math.floor(Math.random() * 10) - 5))
+            r: Math.max(0, Math.min(255, baseColor.r + textureModifier.r + Math.floor(Math.random() * 6) - 3)),
+            g: Math.max(0, Math.min(255, baseColor.g + textureModifier.g + Math.floor(Math.random() * 6) - 3)),
+            b: Math.max(0, Math.min(255, baseColor.b + textureModifier.b + Math.floor(Math.random() * 6) - 3))
         };
     }
 };

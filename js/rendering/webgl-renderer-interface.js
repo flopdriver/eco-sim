@@ -84,6 +84,13 @@ window.WebGLRenderingSystem = {
         return this.rendererCore.render();
     },
 
+    // Mark a pixel as dirty for rendering
+    markPixelDirty: function(index) {
+        if (this.rendererCore) {
+            this.rendererCore.markPixelDirty(index);
+        }
+    },
+
     // Resize the rendering canvas
     resize: function(width, height) {
         return this.rendererCore.resize(width, height);

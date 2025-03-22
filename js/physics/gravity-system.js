@@ -246,6 +246,13 @@ const GravitySystem = {
         // Count how many sides are unsupported
         let unsupportedCount = 0;
 
+        // Check if there are nearby roots (5x5 area) that should stabilize this soil
+        if (this.hasNearbyRoots(x, y, 2)) {
+            // Reduce chance of falling if near roots
+            // Return early with reduced probability (80% less likely to fall)
+            return Math.random() < 0.2 * (unsupportedCount / 10) * this.soilCompactionStrength;
+        }
+
         // Check sides
         if (leftIndex === -1 || this.physics.core.type[leftIndex] === this.physics.TYPE.AIR ||
             this.physics.core.type[leftIndex] === this.physics.TYPE.WATER) {
@@ -273,6 +280,25 @@ const GravitySystem = {
         const fallProbability = (unsupportedCount / 10) * this.soilCompactionStrength;
 
         return Math.random() < fallProbability;
+    },
+
+    // Helper method to check if there are plant roots nearby
+    hasNearbyRoots: function(x, y, radius) {
+        for (let dy = -radius; dy <= radius; dy++) {
+            for (let dx = -radius; dx <= radius; dx++) {
+                const nx = x + dx;
+                const ny = y + dy;
+                const checkIndex = this.physics.core.getIndex(nx, ny);
+                
+                if (checkIndex !== -1 && 
+                    this.physics.core.type[checkIndex] === this.physics.TYPE.PLANT && 
+                    this.physics.core.state[checkIndex] === this.physics.STATE.ROOT) {
+                    // Found a root nearby
+                    return true;
+                }
+            }
+        }
+        return false;
     },
 
     // Apply gravity to soil pixels (with special compaction behavior)
@@ -311,6 +337,20 @@ const GravitySystem = {
         const downIndex = this.physics.core.getIndex(x, y + 1);
 
         if (downIndex === -1) return false;
+        
+        // Check if there are roots directly below or diagonally below
+        // If so, make soil more likely to compact than fall
+        const belowX = x;
+        const belowY = y + 1;
+        if (this.hasNearbyRoots(belowX, belowY, 1)) {
+            // Root is directly supporting this soil
+            if (Math.random() < 0.8) {
+                // Increase soil stability by roots (80% chance to compact instead of fall)
+                this.compactSoil(index);
+                nextActivePixels.add(index);
+                return true;
+            }
+        }
 
         // Soil can fall into air or water
         if (this.physics.core.type[downIndex] === this.physics.TYPE.AIR ||
@@ -384,12 +424,51 @@ const GravitySystem = {
             }
         }
 
+        // Special case: soil compaction around roots
+        if (this.physics.core.type[downIndex] === this.physics.TYPE.PLANT && 
+            this.physics.core.state[downIndex] === this.physics.STATE.ROOT) {
+            
+            // Soil resting on roots should be very stable
+            // Instead of removing the soil, make it more compacted and stable
+            this.physics.core.nutrient[index] = Math.min(255, this.physics.core.nutrient[index] + 15);
+            
+            // Indicate this soil is stable/fertile from root interaction
+            if (this.physics.core.state[index] !== this.physics.STATE.CLAY &&
+                this.physics.core.state[index] !== this.physics.STATE.SANDY &&
+                this.physics.core.state[index] !== this.physics.STATE.LOAMY &&
+                this.physics.core.state[index] !== this.physics.STATE.ROCKY) {
+                // Chance to become fertile soil from root interaction
+                if (Math.random() < 0.1) {
+                    this.physics.core.state[index] = this.physics.STATE.FERTILE;
+                }
+            }
+            
+            // Keep this soil active but stable
+            nextActivePixels.add(index);
+            return true;
+        }
+
         return false;
     },
 
     // Helper method to try moving soil diagonally down
     trySoilMoveDiagonal: function(fromIndex, toIndex, nextActivePixels) {
         if (toIndex === -1) return false;
+        
+        // Get coordinates for root checking
+        const coords = this.physics.core.getCoords(fromIndex);
+        const toCoords = this.physics.core.getCoords(toIndex);
+        
+        // If we're trying to move diagonally but there's a root at the destination
+        // or near the destination, stabilize the soil instead
+        if (toCoords && this.hasNearbyRoots(toCoords.x, toCoords.y, 1)) {
+            if (Math.random() < 0.75) {
+                // Stabilize soil instead of moving it (roots bind soil)
+                this.compactSoil(fromIndex);
+                nextActivePixels.add(fromIndex);
+                return true;
+            }
+        }
 
         // Soil can only move into air or water
         if (this.physics.core.type[toIndex] === this.physics.TYPE.AIR ||
@@ -424,6 +503,27 @@ const GravitySystem = {
             nextActivePixels.add(toIndex);
             nextActivePixels.add(fromIndex);
 
+            return true;
+        }
+        
+        // If the destination is a root, handle it specially
+        if (this.physics.core.type[toIndex] === this.physics.TYPE.PLANT &&
+            this.physics.core.state[toIndex] === this.physics.STATE.ROOT) {
+            
+            // Increased compaction near roots
+            this.physics.core.nutrient[fromIndex] = Math.min(255, this.physics.core.nutrient[fromIndex] + 10);
+            
+            // Small chance to make soil more fertile from root interaction
+            if (Math.random() < 0.08 &&
+                this.physics.core.state[fromIndex] !== this.physics.STATE.CLAY &&
+                this.physics.core.state[fromIndex] !== this.physics.STATE.SANDY &&
+                this.physics.core.state[fromIndex] !== this.physics.STATE.LOAMY &&
+                this.physics.core.state[fromIndex] !== this.physics.STATE.ROCKY) {
+                this.physics.core.state[fromIndex] = this.physics.STATE.FERTILE;
+            }
+            
+            // Keep this soil active but don't move it
+            nextActivePixels.add(fromIndex);
             return true;
         }
 

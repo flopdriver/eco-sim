@@ -47,8 +47,12 @@ window.VisualizationSystem = {
         this.updateVisualizationUI(mode);
 
         // Notify rendering system about mode change
-        if (window.WebGLRenderingSystem) {
+        if (window.ecosim && window.ecosim.rendering) {
+            window.ecosim.rendering.setVisualizationMode(mode);
+        } else if (window.WebGLRenderingSystem) {
             window.WebGLRenderingSystem.setVisualizationMode(mode);
+        } else {
+            console.warn('Rendering system not found');
         }
     },
 
@@ -141,128 +145,68 @@ window.VisualizationSystem = {
         document.body.appendChild(this.selectionTooltip);
     },
     
-    // Update the position and size of the selection highlight to align precisely with cursor
+    // Update highlight position and size
     updateSelectionHighlight: function(x, y, radius) {
         if (!this.selectionHighlight) return;
         
-        // Convert simulation coordinates to screen coordinates
-        // Using exact mouse coordinates for perfect cursor alignment
-        let screenCoords;
-        if (window.ZoomController) {
-            // Use exact coordinates for perfect cursor alignment
-            screenCoords = window.ZoomController.simToClientCoordinates(x, y);
-        } else {
-            // Fall back to basic conversion if zoom controller isn't available
-            const canvas = this.userInteraction.canvas;
-            const rect = canvas.getBoundingClientRect();
-            const pixelSize = this.userInteraction.core.pixelSize;
-            
-            // Use exact coordinates for perfect alignment with cursor
-            screenCoords = {
-                x: rect.left + (x * pixelSize),
-                y: rect.top + (y * pixelSize)
-            };
-        }
+        // Get canvas position for proper alignment
+        const canvasRect = this.userInteraction.canvas.getBoundingClientRect();
         
-        // Calculate visual radius based on zoom
-        let visualRadius = radius;
-        if (window.ZoomController) {
-            visualRadius = radius * window.ZoomController.currentZoom;
-        }
+        // Calculate highlight position relative to canvas
+        const highlightSize = radius * 2 * window.ecosim.rendering.rendererCore.currentScaleFactor;
+        const highlightX = canvasRect.left + x - radius;
+        const highlightY = canvasRect.top + y - radius;
         
-        // Position the highlight exactly centered on the cursor position
-        this.selectionHighlight.style.left = (screenCoords.x - visualRadius) + 'px';
-        this.selectionHighlight.style.top = (screenCoords.y - visualRadius) + 'px';
-        this.selectionHighlight.style.width = (visualRadius * 2) + 'px';
-        this.selectionHighlight.style.height = (visualRadius * 2) + 'px';
+        // Set highlight style
+        this.selectionHighlight.style.width = `${highlightSize}px`;
+        this.selectionHighlight.style.height = `${highlightSize}px`;
+        this.selectionHighlight.style.left = `${highlightX}px`;
+        this.selectionHighlight.style.top = `${highlightY}px`;
         this.selectionHighlight.style.display = 'block';
-        this.selectionHighlight.style.borderStyle = 'solid'; // Reset from dragging
-        this.selectionHighlight.style.opacity = '1.0';       // Reset from dragging
-        
-        // Pulse animation effect
-        this.selectionHighlight.style.animation = 'highlight-pulse 1.5s infinite';
     },
     
-    // Move the highlight to follow dragging, ensuring it's centered precisely with the cursor
+    // Move highlight during drag operations
     moveHighlight: function(x, y) {
         if (!this.selectionHighlight) return;
         
-        // Convert simulation coordinates to screen coordinates
-        // Using exact mouse coordinates for perfect alignment
-        let screenCoords;
-        if (window.ZoomController) {
-            // Use exact mouse coordinates for precise cursor centering
-            screenCoords = window.ZoomController.simToClientCoordinates(x, y);
-        } else {
-            // Fall back to basic conversion if zoom controller isn't available
-            const canvas = this.userInteraction.canvas;
-            const rect = canvas.getBoundingClientRect();
-            const pixelSize = this.userInteraction.core.pixelSize;
-            
-            // Use exact coordinates for precise alignment with cursor
-            screenCoords = {
-                x: rect.left + (x * pixelSize),
-                y: rect.top + (y * pixelSize)
-            };
-        }
+        // Get canvas position for proper alignment
+        const canvasRect = this.userInteraction.canvas.getBoundingClientRect();
         
-        // Get current size of the highlight
-        const width = parseInt(this.selectionHighlight.style.width);
-        const height = parseInt(this.selectionHighlight.style.height);
+        // Update position only, keep same size
+        const size = parseInt(this.selectionHighlight.style.width);
+        const radius = size / 2;
+        const highlightX = canvasRect.left + x - radius;
+        const highlightY = canvasRect.top + y - radius;
         
-        // Position the highlight precisely centered on the exact cursor position
-        this.selectionHighlight.style.left = (screenCoords.x - width/2) + 'px';
-        this.selectionHighlight.style.top = (screenCoords.y - height/2) + 'px';
-        
-        // Change style during dragging to provide visual feedback
-        this.selectionHighlight.style.borderStyle = 'dashed';
-        this.selectionHighlight.style.opacity = '0.7';
+        this.selectionHighlight.style.left = `${highlightX}px`;
+        this.selectionHighlight.style.top = `${highlightY}px`;
     },
     
-    // Clear the selection highlight
+    // Show tooltip with information
+    showTooltip: function(x, y, text) {
+        if (!this.selectionTooltip) {
+            this.createSelectionHighlight();
+        }
+        
+        // Get canvas position for proper alignment
+        const canvasRect = this.userInteraction.canvas.getBoundingClientRect();
+        
+        // Position tooltip near cursor
+        const tooltipX = canvasRect.left + x + 15;
+        const tooltipY = canvasRect.top + y - 15;
+        
+        this.selectionTooltip.textContent = text;
+        this.selectionTooltip.style.left = `${tooltipX}px`;
+        this.selectionTooltip.style.top = `${tooltipY}px`;
+        this.selectionTooltip.style.display = 'block';
+    },
+    
+    // Clear all highlights and tooltips
     clearHighlights: function() {
         if (this.selectionHighlight) {
             this.selectionHighlight.style.display = 'none';
         }
         
-        if (this.selectionTooltip) {
-            this.selectionTooltip.style.display = 'none';
-        }
-    },
-    
-    // Show a tooltip at specific coordinates
-    showTooltip: function(x, y, text) {
-        if (!this.selectionTooltip) {
-            this.selectionTooltip = document.createElement('div');
-            this.selectionTooltip.className = 'selection-tooltip';
-            document.body.appendChild(this.selectionTooltip);
-        }
-        
-        // Convert simulation coordinates to screen coordinates
-        let screenCoords;
-        if (window.ZoomController) {
-            screenCoords = window.ZoomController.simToClientCoordinates(x, y);
-        } else {
-            // Fall back to basic conversion
-            const canvas = this.userInteraction.canvas;
-            const rect = canvas.getBoundingClientRect();
-            const pixelSize = this.userInteraction.core.pixelSize;
-            
-            screenCoords = {
-                x: rect.left + (x * pixelSize),
-                y: rect.top + (y * pixelSize)
-            };
-        }
-        
-        // Position the tooltip
-        this.selectionTooltip.style.left = (screenCoords.x + 15) + 'px';
-        this.selectionTooltip.style.top = (screenCoords.y - 30) + 'px';
-        this.selectionTooltip.textContent = text;
-        this.selectionTooltip.style.display = 'block';
-    },
-    
-    // Hide the tooltip
-    hideTooltip: function() {
         if (this.selectionTooltip) {
             this.selectionTooltip.style.display = 'none';
         }

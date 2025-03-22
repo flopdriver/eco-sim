@@ -153,6 +153,36 @@ window.ToolSystem = {
             if (intensity > 0.3) {
                 this.core.type[index] = this.TYPE.WATER;
                 this.core.water[index] = Math.min(255, waterAmount);
+                
+                // Try to penetrate the ground more effectively
+                const groundLevel = this.core.getSoilHeight(x);
+                const isNearSoilLine = (y >= groundLevel - 5 && y <= groundLevel);
+                
+                // Also check using the new soil boundary function 
+                const soilLinePosition = this.core.getSoilLinePosition(x, y, 0);
+                const isAtOrNearSoilLine = (soilLinePosition >= -5 && soilLinePosition <= 0);
+                
+                // Use either method to determine if we're near the soil line
+                if (isNearSoilLine || isAtOrNearSoilLine) {
+                    // Check pixels below to enhance ground penetration
+                    for (let depth = 1; depth <= 3; depth++) {
+                        const belowIndex = this.core.getIndex(x, y + depth);
+                        if (belowIndex !== -1) {
+                            if (this.core.type[belowIndex] === this.TYPE.AIR) {
+                                // Put water below the surface
+                                this.core.type[belowIndex] = this.TYPE.WATER;
+                                this.core.water[belowIndex] = Math.min(255, waterAmount * 0.8);
+                            } else if (this.core.type[belowIndex] === this.TYPE.SOIL) {
+                                // Add water to soil for faster absorption
+                                this.core.water[belowIndex] = Math.min(255, this.core.water[belowIndex] + waterAmount * 0.8);
+                                if (this.core.water[belowIndex] > 20) {
+                                    this.core.state[belowIndex] = this.STATE.WET;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
             }
         } else if (this.core.type[index] === this.TYPE.SOIL) {
             // Add water to soil - soil absorbs water effectively
@@ -161,6 +191,27 @@ window.ToolSystem = {
             // Update soil state based on wetness
             if (this.core.water[index] > 20) {
                 this.core.state[index] = this.STATE.WET;
+            }
+            
+            // Promote water propagation to neighboring soil cells
+            const neighbors = [
+                {x: x-1, y: y},   // Left
+                {x: x+1, y: y},   // Right
+                {x: x, y: y+1},   // Down
+                {x: x-1, y: y+1}, // Down left
+                {x: x+1, y: y+1}  // Down right
+            ];
+            
+            // Add water to neighboring soil cells
+            for (const neighbor of neighbors) {
+                const neighborIndex = this.core.getIndex(neighbor.x, neighbor.y);
+                if (neighborIndex !== -1 && this.core.type[neighborIndex] === this.TYPE.SOIL) {
+                    // Neighboring soil gets water too (less than the direct application)
+                    this.core.water[neighborIndex] = Math.min(255, this.core.water[neighborIndex] + Math.floor(waterAmount * 0.6));
+                    if (this.core.water[neighborIndex] > 20) {
+                        this.core.state[neighborIndex] = this.STATE.WET;
+                    }
+                }
             }
         } else if (this.core.type[index] === this.TYPE.PLANT) {
             // Plants can absorb some water
@@ -178,12 +229,21 @@ window.ToolSystem = {
             const belowIndex = this.core.getIndex(x, y + 1);
             const hasSoilBelow = belowIndex !== -1 && this.core.type[belowIndex] === this.TYPE.SOIL;
             const isInSoil = this.core.type[index] === this.TYPE.SOIL;
+            
+            // Check if we're at the soil-air boundary which is ideal for planting
+            const isAtSoilLine = this.core.isAtSoilAirBoundary(x, y, 0);
+            const isBelowSoilIndex = this.core.getIndex(x, y+1);
+            const isJustAboveSoil = isBelowSoilIndex !== -1 && 
+                                  this.core.isAtSoilAirBoundary(x, y+1, 0);
 
             // Adjust chance factor based on where we're planting
             let chanceFactor = 1.0;
             if (isInSoil) {
                 // Higher chance when planting directly in soil (preferred)
                 chanceFactor = 2.0;
+            } else if (isAtSoilLine || isJustAboveSoil) {
+                // Significantly higher chance when planting at soil-air boundary (ideal)
+                chanceFactor = 2.5;
             } else if (hasSoilBelow) {
                 // Slightly higher chance when on top of soil
                 chanceFactor = 1.5;

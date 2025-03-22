@@ -12,6 +12,62 @@ EcoSim is a web-based ecological simulator that models complex interactions betw
 - Day/night cycles affecting ecosystem behavior
 - Gravity and fluid dynamics
 
+## System Implementation Details
+
+The ecosystem simulation works through these interconnected systems:
+
+1. **Seed Germination System**: Seeds require sufficient water in surrounding soil to germinate. Seeds convert to plant roots when conditions are met, with germination chance influenced by soil moisture, depth, and fire adaptation.
+
+2. **Plant Growth System**: Plants grow through connected parts (roots, stems, leaves, flowers) that work together:
+   - Roots absorb water and nutrients from soil
+   - Stems transport water upward and provide structural support
+   - Leaves capture energy and create nutrients
+   - The plant system ensures connectivity to maintain resource flow
+
+3. **Soil Moisture Dynamics**: Water flows through soil based on soil type properties:
+   - Clay soil: Slow drainage, high water retention
+   - Sandy soil: Fast drainage, low retention
+   - Loamy soil: Balanced properties for optimal plant growth
+   - Different soil layers form naturally at various depths
+
+4. **Water Transportation**: The fluid dynamics system handles water movement:
+   - Water flows downward due to gravity
+   - Soil absorbs water based on type and saturation
+   - Plants interact with water through absorption at roots, stems, and leaves
+   - Water distributes through plant systems to sustain growth
+
+5. **Plant-Water Interaction**: Water provides essential hydration:
+   - Roots seek out and absorb water from soil
+   - Water flows upward through the plant via stems
+   - Larger plants develop more efficient water transport systems
+   - Insufficient water leads to stunted growth or death
+
+## Recent Fixes
+
+The plant growth system was enhanced by addressing several issues:
+
+1. **Seed Germination Improvement**:
+   - Reduced water requirements for germination (from 25 to 10)
+   - Increased germination chance (40% to 60%)
+   - Reduced energy loss rate for seeds to improve viability
+
+2. **Water Absorption Enhancement**:
+   - Improved root absorption efficiency of water from soil
+   - Enhanced water distribution through plant vascular system
+   - Reduced minimum water thresholds needed for absorption
+
+3. **Soil Moisture Optimization**:
+   - Adjusted soil type distribution to favor plant-friendly loamy soil
+   - Fine-tuned drainage rates for better water availability
+   - Modified soil layer composition for improved water retention
+
+4. **Fluid Dynamics Refinement**:
+   - Increased water flow rates for better soil saturation
+   - Reduced evaporation rates to maintain moisture
+   - Enhanced plant-water interaction for more effective absorption
+
+These modifications ensure that plants have sufficient access to water for germination and growth, resulting in a more vibrant ecosystem.
+
 ## Setup and Running
 
 1. Clone the repository

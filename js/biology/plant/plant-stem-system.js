@@ -215,6 +215,9 @@ window.PlantStemSystem = {
         const groundLevel = this.getSoilHeight(x);
         const plantHeight = this.plant.plantMetrics.stemHeight;
         
+        // Check if stem is at the soil-air boundary
+        const isAtSoilLine = this.plant.core.isAtSoilAirBoundary(x, y, this.plant.frameCount);
+        
         // Check if connected to other plant parts - stems should not grow in isolation
         let isConnectedToBranch = false;
         const neighbors = this.plant.core.getNeighborIndices(x, y);

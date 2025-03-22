@@ -7,22 +7,23 @@ window.PlantRootSystem = {
 
     // Root growth patterns and parameters
     rootPatterns: {
-        primaryGrowthRate: 5.0,    // Dramatically increased for aggressive deep growth
-        lateralGrowthRate: 0.30,    // Slightly reduced to encourage deeper growth
-        secondaryGrowthRate: 0.25,  // Maintained for dense root networks
-        tertiaryGrowthRate: 0.15,   // Maintained for intricate root systems
-        depthFactor: 0.8,           // Increased to encourage deeper growth
-        maxRootDepth: 600,          // Massively increased maximum depth for extremely deep roots
-        rootDensityFactor: 2.0,     // Maintained for dense root systems
-        rootSpreadFactor: 1.2,      // Slightly reduced to focus more on depth than spread
-        waterSeeking: 0.9,          // Increased to make roots more aggressively seek water sources
-        nutrientSeeking: 0.7,       // Increased to make roots more aggressively seek nutrient sources
-        fractalIterationLimit: 3,   // Controls recursion depth for branching patterns
-        maturityThreshold: 15,      // Plant height at which mature root patterns begin
-        ageVariation: true,         // Whether roots change behavior based on their age/depth
-        growthVariability: 0.2  ,
-        tendrilFrequency: 0.02,     // Chance to generate a tendril each update
-        tendrilMaxLength: 150// Random variation in growth rates for natural appearance
+        primaryGrowthRate: 7.0,       // Faster primary root growth 
+        lateralGrowthRate: 0.35,      // Balanced lateral growth
+        secondaryGrowthRate: 0.20,    // Slightly reduced for more natural density
+        tertiaryGrowthRate: 0.10,     // Better tertiary growth patterning
+        depthFactor: 0.85,            // Encourage depth growth
+        maxRootDepth: 600,            // Deep maximum depth
+        rootDensityFactor: 1.8,       // Slightly reduced density for cleaner appearance
+        rootSpreadFactor: 1.3,        // Slightly increased spread for better visibility
+        waterSeeking: 0.8,            // Seek water but not aggressively
+        nutrientSeeking: 0.6,         // Seek nutrients but not aggressively
+        fractalIterationLimit: 3,     // Controls recursion depth for branching patterns
+        maturityThreshold: 15,        // Plant height at which mature root patterns begin
+        ageVariation: true,           // Whether roots change behavior based on their age/depth
+        growthVariability: 0.15,      // Reduced randomness for more structured appearance
+        tendrilFrequency: 0.01,       // Reduced tendril frequency for cleaner look
+        tendrilMaxLength: 80,         // Shorter tendrils for more natural appearance
+        mainRootProbability: 0.15     // Probability of creating a main taproot
     },
 
     // Track tendril information
@@ -52,63 +53,52 @@ window.PlantRootSystem = {
         nextActivePixels.add(index);
     },
 
-    // Generate exploratory root tendrils
+    // Generate exploratory root tendrils - updated to create fewer, more natural-looking tendrils
     generateTendrils: function(x, y, index, nextActivePixels) {
         // Chance to generate a tendril depends on root's maturity and plant metrics
         const plantMaturity = this.plant.plantMetrics.stemHeight / this.rootPatterns.maturityThreshold;
-        const tendrilChance = this.rootPatterns.tendrilFrequency * (1 + plantMaturity);
+        const tendrilChance = this.rootPatterns.tendrilFrequency * (0.8 + plantMaturity);
 
         // Tracking for this specific root
         if (!this.tendrilTracking[index]) {
             this.tendrilTracking[index] = {
                 activeTendrils: 0,
-                lastTendrilTime: 0
+                lastTendrilTime: 0,
+                tendrilLength: 0,
+                isMainRoot: false
             };
         }
 
-        // Limited number of tendrils per root, based on plant size
-        const maxTendrils = Math.min(4, Math.floor(plantMaturity * 2));
+        // Limited number of tendrils per root, based on plant size - reduced for less clutter
+        const maxTendrils = Math.min(3, Math.floor(plantMaturity * 1.5));
 
         // Conditions for generating a tendril
         if (Math.random() < tendrilChance &&
             this.tendrilTracking[index].activeTendrils < maxTendrils &&
             this.plant.core.energy[index] > 50) {
 
-            // Choose a direction for the tendril
+            // Choose a direction for the tendril - more natural growth directions
             const tendrilDirections = [
-                {dx: -1, dy: 0},  // Left
-                {dx: 1, dy: 0},   // Right
-                {dx: -1, dy: 1},  // Down-left
-                {dx: 1, dy: 1},   // Down-right
-                {dx: 0, dy: 1},   // Directly down
-                {dx: -2, dy: 1},  // Far down-left
-                {dx: 2, dy: 1}    // Far down-right
+                {dx: -1, dy: 1, weight: 1.2},  // Down-left
+                {dx: 1, dy: 1, weight: 1.2},   // Down-right
+                {dx: 0, dy: 1, weight: 1.5},   // Directly down - more common
+                {dx: -1, dy: 2, weight: 0.6},  // Steep down-left
+                {dx: 1, dy: 2, weight: 0.6},   // Steep down-right
+                {dx: -2, dy: 1, weight: 0.3},  // Far left-down - uncommon
+                {dx: 2, dy: 1, weight: 0.3}    // Far right-down - uncommon
             ];
 
-            // Weighted selection of directions
-            const directions = tendrilDirections.map(dir => {
-                let weight = 1.0;
-
-                // More likely to go down, less likely to go sideways
-                if (dir.dy > 0) weight *= 1.5;
-
-                // Discourage very long sideways movements
-                if (Math.abs(dir.dx) > 1) weight *= 0.5;
-
-                return { dir, weight };
-            });
-
             // Calculate total weight
-            const totalWeight = directions.reduce((sum, d) => sum + d.weight, 0);
+            const totalWeight = tendrilDirections.reduce((sum, dir) => sum + dir.weight, 0);
 
             // Select direction
             let randomValue = Math.random() * totalWeight;
             let selectedDirection = null;
 
-            for (const dirData of directions) {
-                randomValue -= dirData.weight;
+            for (const dir of tendrilDirections) {
+                randomValue -= dir.weight;
                 if (randomValue <= 0) {
-                    selectedDirection = dirData.dir;
+                    selectedDirection = dir;
                     break;
                 }
             }
@@ -122,11 +112,23 @@ window.PlantRootSystem = {
                 // Can only grow into soil or air with some restrictions
                 if (newIndex !== -1 &&
                     (this.plant.core.type[newIndex] === this.plant.TYPE.SOIL ||
-                        this.plant.core.type[newIndex] === this.plant.TYPE.AIR)) {
+                     this.plant.core.type[newIndex] === this.plant.TYPE.AIR)) {
 
                     // Create thin, exploratory root tendril
                     this.plant.core.type[newIndex] = this.plant.TYPE.PLANT;
                     this.plant.core.state[newIndex] = this.plant.STATE.ROOT;
+
+                    // Determine if this will be a main root or a normal small root
+                    const isMainRoot = Math.random() < this.rootPatterns.mainRootProbability;
+                    if (isMainRoot) {
+                        // Set metadata for main roots (20-39 for main roots)
+                        // This will be used by the color mapper to render thicker, darker roots
+                        const thickness = 20 + Math.floor(Math.random() * 19);
+                        this.plant.core.metadata[newIndex] = thickness;
+                    } else {
+                        // Small roots have no special metadata
+                        this.plant.core.metadata[newIndex] = 0;
+                    }
 
                     // Use less energy for thin tendrils
                     this.plant.core.energy[newIndex] = this.plant.core.energy[index] * 0.3;
@@ -144,21 +146,19 @@ window.PlantRootSystem = {
                     // Update tendril tracking
                     this.tendrilTracking[index].activeTendrils++;
                     this.tendrilTracking[index].lastTendrilTime = Date.now();
-
-                    // Track tendrils for length control
-                    if (!this.tendrilTracking[newIndex]) {
-                        this.tendrilTracking[newIndex] = {
-                            parentIndex: index,
-                            tendrilLength: 1
-                        };
-                    }
+                    this.tendrilTracking[newIndex] = {
+                        parentIndex: index,
+                        tendrilLength: 1,
+                        isMainRoot: isMainRoot,
+                        activeTendrils: 0
+                    };
 
                     nextActivePixels.add(newIndex);
                 }
             }
         }
 
-        // Optional: Manage existing tendrils
+        // Manage existing tendrils
         this.manageTendrils(x, y, index, nextActivePixels);
     },
 
@@ -167,9 +167,99 @@ window.PlantRootSystem = {
         const tracking = this.tendrilTracking[index];
         if (!tracking) return;
 
-        // Periodically reduce active tendril count
-        if (tracking.activeTendrils > 0 && Math.random() < 0.01) {
-            tracking.activeTendrils--;
+        // Periodically reduce active tendril count as they mature
+        if (tracking.activeTendrils > 0 && Math.random() < 0.02) {
+            tracking.activeTendrils = Math.max(0, tracking.activeTendrils - 1);
+        }
+
+        // Limit the length of tendrils to create more natural looking root systems
+        if (tracking.tendrilLength > 0) {
+            // Continue growing this tendril until it reaches max length
+            const maxLength = tracking.isMainRoot ? 
+                this.rootPatterns.tendrilMaxLength * 2 : // Main roots grow longer
+                this.rootPatterns.tendrilMaxLength * (0.7 + Math.random() * 0.5); // Variable length for normal roots
+            
+            if (tracking.tendrilLength < maxLength) {
+                // Continue growth with decreasing probability as we get longer
+                const continueProbability = 0.8 * (1 - tracking.tendrilLength / maxLength);
+                if (Math.random() < continueProbability) {
+                    // Choose growth direction with preference for continuing current direction
+                    const possibleDirections = [
+                        {dx: -1, dy: 1, weight: 0.8},   // Down-left
+                        {dx: 0, dy: 1, weight: 1.5},    // Directly down - preferred
+                        {dx: 1, dy: 1, weight: 0.8},    // Down-right
+                        {dx: -1, dy: 0, weight: 0.1},   // Left - rare
+                        {dx: 1, dy: 0, weight: 0.1}     // Right - rare
+                    ];
+                    
+                    // If this is a main root, heavily favor downward growth
+                    if (tracking.isMainRoot) {
+                        possibleDirections.find(d => d.dx === 0 && d.dy === 1).weight = 3.0;
+                    }
+
+                    // Calculate total weight
+                    const totalWeight = possibleDirections.reduce((sum, dir) => sum + dir.weight, 0);
+                    
+                    // Select direction
+                    let randomValue = Math.random() * totalWeight;
+                    let selectedDirection = null;
+                    
+                    for (const dir of possibleDirections) {
+                        randomValue -= dir.weight;
+                        if (randomValue <= 0) {
+                            selectedDirection = dir;
+                            break;
+                        }
+                    }
+                    
+                    if (selectedDirection) {
+                        const newX = x + selectedDirection.dx;
+                        const newY = y + selectedDirection.dy;
+                        const newIndex = this.plant.core.getIndex(newX, newY);
+                        
+                        // Check if we can grow into this spot
+                        if (newIndex !== -1 && 
+                            (this.plant.core.type[newIndex] === this.plant.TYPE.SOIL || 
+                             this.plant.core.type[newIndex] === this.plant.TYPE.AIR)) {
+                            
+                            // Create the new root segment
+                            this.plant.core.type[newIndex] = this.plant.TYPE.PLANT;
+                            this.plant.core.state[newIndex] = this.plant.STATE.ROOT;
+                            
+                            // Apply same metadata for consistent coloring within a root
+                            const thisMetadata = this.plant.core.metadata[index] || 0;
+                            this.plant.core.metadata[newIndex] = thisMetadata;
+                            
+                            // Share resources
+                            this.plant.core.energy[newIndex] = this.plant.core.energy[index] * 0.7;
+                            this.plant.core.water[newIndex] = this.plant.core.water[index] * 0.6;
+                            
+                            // Update tracking
+                            if (this.plant.plantGroups[index]) {
+                                this.plant.plantGroups[newIndex] = this.plant.plantGroups[index];
+                            }
+                            
+                            // Create tracking for the new segment
+                            this.tendrilTracking[newIndex] = {
+                                parentIndex: index,
+                                tendrilLength: tracking.tendrilLength + 1,
+                                isMainRoot: tracking.isMainRoot,
+                                activeTendrils: 0,
+                                lastTendrilTime: Date.now()
+                            };
+                            
+                            // Occasionally branch from main roots as they grow deeper
+                            if (tracking.isMainRoot && tracking.tendrilLength > 15 && Math.random() < 0.15) {
+                                // This will become a branch point from the main root
+                                tracking.activeTendrils++;
+                            }
+                            
+                            // Add to active pixels
+                            nextActivePixels.add(newIndex);
+                        }
+                    }
+                }
+            }
         }
     },
 
@@ -231,7 +321,7 @@ window.PlantRootSystem = {
         const groundLevel = this.getSoilHeight(x);
         const depthFromSurface = y - groundLevel; // How far below ground
         const maxDesiredRootDepth = Math.min(this.rootPatterns.maxRootDepth,
-            Math.max(400, this.plant.plantMetrics.stemHeight * 6.0)); // Roots much deeper than stem height
+            Math.max(400, this.plant.plantMetrics.stemHeight * 5.0)); // 5x deeper than stem height
 
         // Get plant maturity indicators
         const stemHeight = this.plant.plantMetrics.stemHeight;
@@ -241,111 +331,129 @@ window.PlantRootSystem = {
         const rootAge = depthFromSurface / maxDesiredRootDepth; // 0 = new, 1 = oldest
 
         // Root depth zone affects growth behavior (creates distinct layers)
-        // Modified to expand deep zone and reduce shallow zone to encourage deeper growth
-        const isShallowZone = depthFromSurface < maxDesiredRootDepth * 0.15;
-        const isMiddleZone = depthFromSurface >= maxDesiredRootDepth * 0.15 &&
-                            depthFromSurface < maxDesiredRootDepth * 0.5;
-        const isDeepZone = depthFromSurface >= maxDesiredRootDepth * 0.5;
+        // More balanced zone distribution
+        const isShallowZone = depthFromSurface < maxDesiredRootDepth * 0.2;
+        const isMiddleZone = depthFromSurface >= maxDesiredRootDepth * 0.2 &&
+                           depthFromSurface < maxDesiredRootDepth * 0.6;
+        const isDeepZone = depthFromSurface >= maxDesiredRootDepth * 0.6;
 
-        // Calculate growth chances factoring in root position and plant maturity
+        // Check if this is a main root segment based on metadata
+        const rootMetadata = this.plant.core.metadata[index] || 0;
+        const isMainRoot = rootMetadata >= 20 && rootMetadata < 40;
 
-        // Primary growth (main taproot) - maintain strength even in deeper areas
-        let primaryGrowthChance = this.rootPatterns.primaryGrowthRate *
-            (1 - (rootAge * 0.4)) * // Reduce less as roots get deeper (changed from 0.7 to 0.4)
-            this.plant.biology.growthRate;
+        // Calculate growth chances - more natural and visually appealing distribution
+        let downGrowthChance = this.rootPatterns.primaryGrowthRate * 0.01 * (1 - rootAge * 0.5);
+        let sideGrowthChance = this.rootPatterns.lateralGrowthRate * 0.01 * (1 - rootAge * 0.3);
+        let branchGrowthChance = this.rootPatterns.secondaryGrowthRate * 0.01 * (1 - rootAge * 0.4);
 
-        // Enhance downward growth for all plants, especially immature ones
-        if (stemHeight < this.rootPatterns.maturityThreshold) {
-            primaryGrowthChance *= 10.5; // Increased from 1.3
-        } else {
-            primaryGrowthChance *= 1.2; // New bonus for mature plants
+        // Modify growth based on depth zone for more natural tapering
+        if (isShallowZone) {
+            // Shallow zone - focus on lateral spread and branching
+            downGrowthChance *= 0.7;
+            sideGrowthChance *= 1.4;
+            branchGrowthChance *= 1.2;
+        } else if (isMiddleZone) {
+            // Middle zone - balanced growth
+            downGrowthChance *= 1.0;
+            sideGrowthChance *= 1.0;
+            branchGrowthChance *= 1.0;
+        } else if (isDeepZone) {
+            // Deep zone - less branching, more elongation and seeking
+            downGrowthChance *= 1.2;
+            sideGrowthChance *= 0.6;
+            branchGrowthChance *= 0.5;
         }
 
-        // Lateral growth - more common in middle depths and mature plants
-        let lateralGrowthFactor = Math.min(2.0, (this.plant.plantMetrics.leafCount / 5) + 0.7);
-        let lateralGrowthChance = this.rootPatterns.lateralGrowthRate *
-            lateralGrowthFactor *
-            this.plant.biology.growthRate;
-
-        // Enhance lateral growth in middle soil layers
-        if (isMiddleZone) {
-            lateralGrowthChance *= 1.5;
+        // Main roots grow more downward with less branching
+        if (isMainRoot) {
+            downGrowthChance *= 1.5;
+            sideGrowthChance *= 0.5;
+            branchGrowthChance *= 0.7;
         }
 
-        // Secondary branching - more common in mature plants and in denser soil layers
-        let secondaryGrowthChance = this.rootPatterns.secondaryGrowthRate *
-            Math.min(2.0, plantMaturity + 0.5) *
-            this.plant.biology.growthRate;
+        // Apply environmental influences
+        const waterFactor = environmentFactors.waterDensity * this.rootPatterns.waterSeeking;
+        const nutrientFactor = environmentFactors.nutrientDensity * this.rootPatterns.nutrientSeeking;
 
-        // Tertiary branching - complex patterns in mature plants
-        let tertiaryGrowthChance = this.rootPatterns.tertiaryGrowthRate *
-            Math.max(0, plantMaturity - 0.5) * // Only in mature plants
-            this.plant.biology.growthRate;
+        // Add subtle environmental response
+        downGrowthChance *= (1 + waterFactor * 0.2);
+        sideGrowthChance *= (1 + nutrientFactor * 0.3);
 
-        // Add soil quality influence
-        const soilQuality = (environmentFactors.soilQualityLeft +
-                           environmentFactors.soilQualityRight +
-                           environmentFactors.soilQualityDown) / 3;
+        // Growth directions with weighted probabilities
+        const growthDirections = [
+            // Downward growth directions
+            {dx: 0, dy: 1, chance: downGrowthChance, type: "down"},
+            {dx: -1, dy: 1, chance: downGrowthChance * 0.6, type: "down-side"},
+            {dx: 1, dy: 1, chance: downGrowthChance * 0.6, type: "down-side"},
+            
+            // Side growth directions
+            {dx: -1, dy: 0, chance: sideGrowthChance, type: "side"},
+            {dx: 1, dy: 0, chance: sideGrowthChance, type: "side"},
+            
+            // Branching growth (more angles for variation)
+            {dx: -2, dy: 1, chance: branchGrowthChance * 0.5, type: "branch"},
+            {dx: 2, dy: 1, chance: branchGrowthChance * 0.5, type: "branch"},
+            {dx: -1, dy: 2, chance: branchGrowthChance * 0.7, type: "branch"},
+            {dx: 1, dy: 2, chance: branchGrowthChance * 0.7, type: "branch"}
+        ];
 
-        // Better soil = more growth
-        const soilFactor = 0.7 + (soilQuality / 200);
-        primaryGrowthChance *= soilFactor;
-        lateralGrowthChance *= soilFactor;
-        secondaryGrowthChance *= soilFactor;
-        tertiaryGrowthChance *= soilFactor;
+        // Try each possible growth direction
+        for (const direction of growthDirections) {
+            // Roll for chance to grow in this direction
+            if (Math.random() > direction.chance) continue;
 
-        // Attempt primary growth (taproot)
-        if (Math.random() < primaryGrowthChance) {
-            this.growPrimaryRoot(x, y, index, environmentFactors, nextActivePixels);
-        }
-
-        // Attempt lateral growth (side branching)
-        if (Math.random() < lateralGrowthChance) {
-            this.growLateralRoot(x, y, index, environmentFactors, nextActivePixels);
-        }
-
-        // Attempt secondary growth (smaller branches off laterals)
-        // More likely in middle and deep zones
-        if ((isMiddleZone || isDeepZone) && Math.random() < secondaryGrowthChance) {
-            // Second argument true means diagonal branching allowed
-            this.growLateralRoot(x, y, index, environmentFactors, nextActivePixels, true);
-        }
-
-        // Attempt tertiary growth (fractal-like fine branching) for mature plants
-        if (plantMaturity > 1 && Math.random() < tertiaryGrowthChance) {
-            // Try growing in multiple directions for dense root networks
-            const randomAngle = Math.floor(Math.random() * 8); // 8 possible directions
-            const dx = [-1, -1, 0, 1, 1, 1, 0, -1][randomAngle];
-            const dy = [0, 1, 1, 1, 0, -1, -1, -1][randomAngle];
-
-            const newX = x + dx;
-            const newY = y + dy;
+            // Calculate new position
+            const newX = x + direction.dx;
+            const newY = y + direction.dy;
             const newIndex = this.plant.core.getIndex(newX, newY);
 
+            // Check if new position is valid
+            if (newIndex === -1) continue;
+
             // Can only grow into soil
-            if (newIndex !== -1 && this.plant.core.type[newIndex] === this.plant.TYPE.SOIL) {
-                // Create new tertiary root (fine hair-like root)
-                this.plant.core.type[newIndex] = this.plant.TYPE.PLANT;
-                this.plant.core.state[newIndex] = this.plant.STATE.ROOT;
+            if (this.plant.core.type[newIndex] !== this.plant.TYPE.SOIL) continue;
 
-                // Transfer minimal resources - these are small structures
-                this.plant.core.energy[newIndex] = this.plant.core.energy[index] * 0.3;
-                this.plant.core.energy[index] *= 0.8;
+            // Create new root segment
+            this.plant.core.type[newIndex] = this.plant.TYPE.PLANT;
+            this.plant.core.state[newIndex] = this.plant.STATE.ROOT;
 
-                this.plant.core.water[newIndex] = this.plant.core.water[index] * 0.3;
-                this.plant.core.water[index] *= 0.8;
-
-                this.plant.core.nutrient[newIndex] = this.plant.core.nutrient[index] * 0.3;
-                this.plant.core.nutrient[index] *= 0.8;
-
-                nextActivePixels.add(newIndex);
+            // Transfer parent metadata for consistent visual appearance
+            if (isMainRoot) {
+                this.plant.core.metadata[newIndex] = rootMetadata;
+            } else {
+                // Occasionally create a new main root when branching downward
+                if (direction.type === "down" && Math.random() < 0.08 * plantMaturity) {
+                    const thickness = 20 + Math.floor(Math.random() * 19);
+                    this.plant.core.metadata[newIndex] = thickness;
+                } else {
+                    this.plant.core.metadata[newIndex] = 0; // Regular root
+                }
             }
-        }
 
-        // Check if we have enough roots to support stem growth
-        // This is more likely in the shallowest zone
-        if (isShallowZone) {
-            this.checkRootMassForStem(x, y, index, nextActivePixels);
+            // Distribute resources
+            // Reduce energy for growth
+            this.plant.core.energy[newIndex] = this.plant.core.energy[index] * 0.8;
+            this.plant.core.energy[index] *= 0.9;
+
+            // Reset water distribution more evenly for new segments
+            this.plant.core.water[newIndex] = Math.max(10, this.plant.core.water[index] * 0.7);
+
+            // Transfer plant group information
+            if (this.plant.plantGroups[index]) {
+                this.plant.plantGroups[newIndex] = this.plant.plantGroups[index];
+            }
+
+            // Initialize tracking for the new growth
+            this.tendrilTracking[newIndex] = {
+                parentIndex: index,
+                tendrilLength: 0,
+                isMainRoot: isMainRoot || this.plant.core.metadata[newIndex] >= 20,
+                activeTendrils: 0,
+                lastTendrilTime: Date.now()
+            };
+
+            // Add to active pixels
+            nextActivePixels.add(newIndex);
         }
     },
 
@@ -412,224 +520,6 @@ window.PlantRootSystem = {
         return environment;
     },
 
-    // Grow the primary (main) root downward
-    growPrimaryRoot: function(x, y, index, environmentFactors, nextActivePixels) {
-        // Primary roots grow mainly downward with some influence from water and nutrients
-        // Calculate optimal growth direction with slight randomness
-
-        let dx = 0;
-        const dy = 1; // Always downward
-
-        // Calculate groundLevel and depth for depth-based behavior
-        const groundLevel = this.getSoilHeight(x);
-        const depthFromSurface = y - groundLevel;
-        const maxDepth = this.rootPatterns.maxRootDepth;
-        const depthRatio = depthFromSurface / maxDepth;
-
-        // Slight sideways tendencies based on water/nutrients and randomness
-        const leftBias = environmentFactors.waterLeft * this.rootPatterns.waterSeeking +
-            environmentFactors.nutrientLeft * this.rootPatterns.nutrientSeeking;
-        const rightBias = environmentFactors.waterRight * this.rootPatterns.waterSeeking +
-            environmentFactors.nutrientRight * this.rootPatterns.nutrientSeeking;
-
-        // Add some randomness to the bias, reduced for deeper roots to encourage straighter growth
-        const randomFactor = Math.random() * 0.4 - 0.2; // -0.2 to 0.2
-        const depthStraighteningFactor = Math.max(0.3, 1.0 - (depthRatio * 0.7)); // Roots get straighter as they go deeper
-
-        // Calculate final horizontal tendency - deeper roots have less horizontal movement
-        const horizontalBias = (rightBias - leftBias + randomFactor) * depthStraighteningFactor;
-
-        // Higher threshold for diagonal growth to prefer straight down
-        const diagonalThreshold = 0.2 + (depthRatio * 0.1); // Gets harder to grow diagonally as depth increases
-
-        // Determine if we should go straight down or diagonally
-        if (horizontalBias > diagonalThreshold) dx = 1;
-        else if (horizontalBias < -diagonalThreshold) dx = -1;
-
-        // Occasionally force straightening for deep taproot effect
-        if (depthFromSurface > 100 && Math.random() < 0.3) {
-            dx = 0; // Force straight down for deep taproots
-        }
-
-        // Try growing in the calculated direction
-        const newX = x + dx;
-        const newY = y + dy;
-        const newIndex = this.plant.core.getIndex(newX, newY);
-
-        // Can only grow into soil
-        if (newIndex !== -1 && this.plant.core.type[newIndex] === this.plant.TYPE.SOIL) {
-            // Create new root
-            this.plant.core.type[newIndex] = this.plant.TYPE.PLANT;
-            this.plant.core.state[newIndex] = this.plant.STATE.ROOT;
-
-            // Transfer some energy and resources to new root
-            this.plant.core.energy[newIndex] = this.plant.core.energy[index] * 0.6;
-            this.plant.core.energy[index] *= 0.7; // Parent root keeps most energy
-
-            this.plant.core.water[newIndex] = this.plant.core.water[index] * 0.5;
-            this.plant.core.water[index] *= 0.7;
-
-            this.plant.core.nutrient[newIndex] = this.plant.core.nutrient[index] * 0.5;
-            this.plant.core.nutrient[index] *= 0.7;
-
-            // Propagate plant group ID for origin tracking
-            if (this.plant.plantGroups[index]) {
-                this.plant.plantGroups[newIndex] = this.plant.plantGroups[index];
-            }
-
-            nextActivePixels.add(newIndex);
-            return true;
-        }
-
-        return false;
-    },
-
-    // Grow lateral (sideways) roots
-    growLateralRoot: function(x, y, index, environmentFactors, nextActivePixels, allowDiagonal = false) {
-        // Lateral roots grow more horizontally with various patterns
-        // Mature plants have more complex branching patterns
-
-        // Get plant maturity and root zone info
-        const groundLevel = this.getSoilHeight(x);
-        const depthFromSurface = y - groundLevel;
-        const stemHeight = this.plant.plantMetrics.stemHeight;
-        const plantMaturity = stemHeight / this.rootPatterns.maturityThreshold;
-
-        // Direction bias based on water and nutrients
-        const waterSeekingFactor = this.rootPatterns.waterSeeking * (1 + (Math.random() * 0.4 - 0.2));
-        const nutrientSeekingFactor = this.rootPatterns.nutrientSeeking * (1 + (Math.random() * 0.4 - 0.2));
-
-        const leftBias = environmentFactors.waterLeft * waterSeekingFactor +
-                       environmentFactors.nutrientLeft * nutrientSeekingFactor +
-                       Math.random() * 0.6;
-
-        const rightBias = environmentFactors.waterRight * waterSeekingFactor +
-                        environmentFactors.nutrientRight * nutrientSeekingFactor +
-                        Math.random() * 0.6;
-
-        // Fractal-like growth patterns for mature plants
-        // More spread for mature plants (wider root system)
-        const spreadFactor = this.rootPatterns.rootSpreadFactor *
-                          (1 + Math.min(0.5, plantMaturity * 0.3));
-
-        // Calculate possible directions with weights
-        let directions = [];
-
-        // Horizontal directions (core lateral growth)
-        if (!environmentFactors.obstacleLeft) {
-            directions.push({ dx: -1, dy: 0, weight: leftBias * spreadFactor });
-        }
-
-        if (!environmentFactors.obstacleRight) {
-            directions.push({ dx: 1, dy: 0, weight: rightBias * spreadFactor });
-        }
-
-        // Downward directions (always an option)
-        directions.push({ dx: 0, dy: 1, weight: 0.7 * (1 - (depthFromSurface / this.rootPatterns.maxRootDepth)) });
-
-        // Diagonal directions for more complex patterns
-        if (allowDiagonal || plantMaturity > 0.8) {
-            // Down-left diagonal
-            if (!environmentFactors.obstacleLeft) {
-                directions.push({ dx: -1, dy: 1, weight: leftBias * 0.6 });
-            }
-
-            // Down-right diagonal
-            if (!environmentFactors.obstacleRight) {
-                directions.push({ dx: 1, dy: 1, weight: rightBias * 0.6 });
-            }
-
-            // For mature plants, allow shallow upward diagonals for dense networks
-            if (plantMaturity > 1.2 && depthFromSurface > this.rootPatterns.maxRootDepth * 0.4) {
-                if (!environmentFactors.obstacleLeft) {
-                    directions.push({ dx: -1, dy: -1, weight: leftBias * 0.3 }); // Up-left
-                }
-
-                if (!environmentFactors.obstacleRight) {
-                    directions.push({ dx: 1, dy: -1, weight: rightBias * 0.3 }); // Up-right
-                }
-            }
-        }
-
-        // If no viable directions, try growing straight down
-        if (directions.length === 0) {
-            return this.growPrimaryRoot(x, y, index, environmentFactors, nextActivePixels);
-        }
-
-        // Calculate total weight for weighted random selection
-        let totalWeight = 0;
-        for (const dir of directions) {
-            totalWeight += dir.weight;
-        }
-
-        // Select a direction based on weighted probabilities
-        let selectedDir = null;
-        const randWeight = Math.random() * totalWeight;
-        let weightSum = 0;
-
-        for (const dir of directions) {
-            weightSum += dir.weight;
-            if (weightSum >= randWeight) {
-                selectedDir = dir;
-                break;
-            }
-        }
-
-        // Use default if selection fails
-        if (!selectedDir) {
-            selectedDir = directions[0];
-        }
-
-        // Try growing in the selected direction
-        const newX = x + selectedDir.dx;
-        const newY = y + selectedDir.dy;
-        const newIndex = this.plant.core.getIndex(newX, newY);
-
-        // Can only grow into soil
-        if (newIndex !== -1 && this.plant.core.type[newIndex] === this.plant.TYPE.SOIL) {
-            // Create new root
-            this.plant.core.type[newIndex] = this.plant.TYPE.PLANT;
-            this.plant.core.state[newIndex] = this.plant.STATE.ROOT;
-
-            // Determine resource allocation based on root type
-            // Different types of roots get different resource allocations
-            let energyTransferRatio, waterTransferRatio, nutrientTransferRatio;
-
-            if (allowDiagonal) {
-                // Secondary roots (smaller branches) receive less energy
-                energyTransferRatio = 0.4;
-                waterTransferRatio = 0.3;
-                nutrientTransferRatio = 0.3;
-
-                // Parent root keeps more
-                this.plant.core.energy[index] *= 0.75;
-                this.plant.core.water[index] *= 0.75;
-                this.plant.core.nutrient[index] *= 0.75;
-            } else {
-                // Primary lateral roots receive more energy
-                energyTransferRatio = 0.5;
-                waterTransferRatio = 0.4;
-                nutrientTransferRatio = 0.4;
-
-                // Parent root keeps less
-                this.plant.core.energy[index] *= 0.7;
-                this.plant.core.water[index] *= 0.7;
-                this.plant.core.nutrient[index] *= 0.7;
-            }
-
-            // Transfer resources to new root
-            this.plant.core.energy[newIndex] = this.plant.core.energy[index] * energyTransferRatio;
-            this.plant.core.water[newIndex] = this.plant.core.water[index] * waterTransferRatio;
-            this.plant.core.nutrient[newIndex] = this.plant.core.nutrient[index] * nutrientTransferRatio;
-
-            // Mark new root as active
-            nextActivePixels.add(newIndex);
-            return true;
-        }
-
-        return false;
-    },
-
     // Absorb water and nutrients from surrounding soil
     absorbWaterAndNutrients: function(x, y, index, nextActivePixels) {
         // Get all neighbors
@@ -639,17 +529,17 @@ window.PlantRootSystem = {
         // Larger plants have more efficient root systems but need more water
         const waterNeeds = this.plant.plantMetrics.waterNeeds;
 
-        // Increase absorption efficiency for larger plants
-        const sizeBonus = Math.sqrt(this.plant.plantMetrics.totalSize / 20);
-        const absorbFactor = Math.min(3.0, 1.0 + sizeBonus * 0.4 + (this.plant.plantMetrics.stemHeight / 25));
+        // FIXED: Increase absorption efficiency for larger plants
+        const sizeBonus = Math.sqrt(this.plant.plantMetrics.totalSize / 15); // Reduced from 20 to 15
+        const absorbFactor = Math.min(4.0, 1.5 + sizeBonus * 0.5 + (this.plant.plantMetrics.stemHeight / 20)); // Increased from 3.0 to 4.0, 1.0 to 1.5, and 0.4 to 0.5
 
         // Check soil neighbors for water and nutrients
         for (const neighbor of neighbors) {
             if (this.plant.core.type[neighbor.index] === this.plant.TYPE.SOIL) {
-                // Extract water if soil has enough (reduced minimum threshold)
-                if (this.plant.core.water[neighbor.index] > 5) {
+                // FIXED: Extract water if soil has enough (reduced minimum threshold)
+                if (this.plant.core.water[neighbor.index] > 3) { // Reduced from 5 to 3
                     // Larger plants extract more water per root with increased extraction rate
-                    const extractAmount = Math.min(7 * absorbFactor, this.plant.core.water[neighbor.index] - 2);
+                    const extractAmount = Math.min(10 * absorbFactor, this.plant.core.water[neighbor.index] - 1); // Increased from 7 to 10, and 2 to 1
                     this.plant.core.water[neighbor.index] -= extractAmount;
                     this.plant.core.water[index] += extractAmount;
 
@@ -661,9 +551,9 @@ window.PlantRootSystem = {
                     nextActivePixels.add(neighbor.index);
                 }
 
-                // Extract nutrients if soil has enough
-                if (this.plant.core.nutrient[neighbor.index] > 5) {
-                    const extractAmount = Math.min(1 * absorbFactor, this.plant.core.nutrient[neighbor.index] - 2);
+                // FIXED: Extract nutrients if soil has enough
+                if (this.plant.core.nutrient[neighbor.index] > 3) { // Reduced from 5 to 3
+                    const extractAmount = Math.min(2 * absorbFactor, this.plant.core.nutrient[neighbor.index] - 1); // Increased from 1 to 2, and 2 to 1
                     this.plant.core.nutrient[neighbor.index] -= extractAmount;
                     this.plant.core.nutrient[index] += extractAmount;
 
@@ -678,11 +568,11 @@ window.PlantRootSystem = {
 
     // Distribute water upward through the plant
     distributeWaterUpward: function(x, y, index, nextActivePixels) {
-        // More frequent water distribution for larger plants with increased distribution chance
-        const distributionChance = Math.min(0.75, 0.3 + (this.plant.plantMetrics.totalSize / 150));
+        // FIXED: More frequent water distribution for larger plants with increased distribution chance
+        const distributionChance = Math.min(0.85, 0.4 + (this.plant.plantMetrics.totalSize / 120)); // Increased from 0.75 to 0.85, 0.3 to 0.4, and 150 to 120
 
-        // Only distribute if we have water to spare (reduced minimum threshold)
-        if (Math.random() < distributionChance && this.plant.core.water[index] > 10) {
+        // FIXED: Only distribute if we have water to spare (reduced minimum threshold)
+        if (Math.random() < distributionChance && this.plant.core.water[index] > 5) { // Reduced from 10 to 5
             // Find connected plant parts above and to the sides
             const neighbors = this.plant.core.getNeighborIndices(x, y);
 
@@ -704,10 +594,10 @@ window.PlantRootSystem = {
             if (upNeighbors.length > 0) {
                 const upNeighbor = upNeighbors[Math.floor(Math.random() * upNeighbors.length)];
 
-                // Transfer water upward - larger plants have better water transport
+                // FIXED: Transfer water upward - larger plants have better water transport
                 // Increased transport efficiency for better water movement
-                const transportEfficiency = Math.min(4.0, 2.0 + (this.plant.plantMetrics.stemHeight / 15));
-                const transferAmount = Math.min(8 * transportEfficiency, this.plant.core.water[index] - 5);
+                const transportEfficiency = Math.min(5.0, 2.5 + (this.plant.plantMetrics.stemHeight / 12)); // Increased from 4.0 to 5.0, 2.0 to 2.5, and 15 to 12
+                const transferAmount = Math.min(10 * transportEfficiency, this.plant.core.water[index] - 3); // Increased from 8 to 10, and 5 to 3
 
                 this.plant.core.water[upNeighbor.index] += transferAmount;
                 this.plant.core.water[index] -= transferAmount;
@@ -715,286 +605,18 @@ window.PlantRootSystem = {
                 nextActivePixels.add(upNeighbor.index);
             }
 
-            // Sometimes distribute horizontally as well (if we still have water to spare)
+            // FIXED: Sometimes distribute horizontally as well (if we still have water to spare)
             // Increased chance of horizontal distribution
-            if (sideNeighbors.length > 0 && this.plant.core.water[index] > 15 && Math.random() < 0.5) {
+            if (sideNeighbors.length > 0 && this.plant.core.water[index] > 10 && Math.random() < 0.65) { // Reduced from 15 to 10, and increased from 0.5 to 0.65
                 const sideNeighbor = sideNeighbors[Math.floor(Math.random() * sideNeighbors.length)];
 
                 // Horizontal transfer efficiency improved
-                const transferAmount = Math.min(5, this.plant.core.water[index] - 10);
+                const transferAmount = Math.min(7, this.plant.core.water[index] - 5); // Increased from 5 to 7, and 10 to 5
 
                 this.plant.core.water[sideNeighbor.index] += transferAmount;
                 this.plant.core.water[index] -= transferAmount;
 
                 nextActivePixels.add(sideNeighbor.index);
-            }
-        }
-    },
-
-    // Check if we have enough root mass to start growing a stem
-    // Also strengthen the root-stem connection
-    checkRootMassForStem: function(x, y, index, nextActivePixels) {
-        // Only grow stem if we're in the upper part of the root system
-        const upIndex = this.plant.core.getIndex(x, y - 1);
-
-        // Calculate ground level for reference
-        const groundLevel = this.getSoilHeight(x);
-
-        // Check if the root is near the surface (within 10 pixels of ground level)
-        const isNearSurface = y <= groundLevel + 10;
-
-        // Only allow stem growth from roots near the surface
-        if (!isNearSurface) {
-            return; // Too deep to grow stems
-        }
-
-        // Verify this root is connected to ground - temporarily disable this check to help initial growth
-        // if (!this.plant.plantConnectivity.connectedToGround[index]) {
-        //     return; // Not properly grounded - no stem growth allowed
-        // }
-
-        // Count nearby root pixels to ensure we have enough root mass
-        let rootCount = this.countNearbyRoots(x, y, 3);  // Check in a 7x7 area (3 distance)
-
-        // Lower the stem threshold to make growth easier
-        // This threshold is now proportional to existing plant size
-        const stemThreshold = 1 + Math.floor(this.plant.plantMetrics.stemHeight / 8);
-
-        // Also check how many nearby roots are connected to ground - reduced requirement
-        let connectedRoots = this.countConnectedRoots(x, y, 3);
-        const connectionThreshold = Math.ceil(stemThreshold * 0.5); // Need at least 50% connected (reduced from 70%)
-
-        // Only attempt to grow stem if we have enough connected root mass - increased chance
-        if (rootCount >= stemThreshold &&
-            (connectedRoots >= connectionThreshold || this.plant.plantMetrics.stemHeight < 5) &&
-            Math.random() < 0.08 * this.plant.biology.growthRate) { // Increased from 0.02 to 0.08
-
-            if (upIndex !== -1) {
-                // Check what's above the root
-                if (this.plant.core.type[upIndex] === this.plant.TYPE.AIR) {
-                    // If air is above, directly create a stem (original behavior)
-                    this.createStemFromRoot(x, y, index, upIndex, nextActivePixels);
-                }
-                else if (this.plant.core.type[upIndex] === this.plant.TYPE.SOIL) {
-                    // If soil is above, attempt to push through it
-                    this.attemptSoilPenetration(x, y, index, upIndex, nextActivePixels);
-                }
-            }
-        }
-    },
-
-    // Attempt to penetrate soil and grow upward
-    attemptSoilPenetration: function(x, y, index, soilIndex, nextActivePixels) {
-        // Stronger roots have higher chance to penetrate soil
-        const rootCount = this.countNearbyRoots(x, y, 3);
-        const penetrationChance = 0.3 + (rootCount / 30); // Base chance plus bonus from root mass
-
-        // More energy = higher penetration chance
-        const energyFactor = Math.min(1.0, this.plant.core.energy[index] / 150);
-
-        // Attempt to break through soil
-        if (Math.random() < penetrationChance * energyFactor) {
-            // Penetration successful - convert soil to stem
-            this.plant.core.type[soilIndex] = this.plant.TYPE.PLANT;
-            this.plant.core.state[soilIndex] = this.plant.STATE.STEM;
-
-            // Penetrating soil costs more energy
-            const energyCost = 10 + Math.floor(Math.random() * 10);
-            this.plant.core.energy[index] = Math.max(10, this.plant.core.energy[index] - energyCost);
-
-            // Transfer remaining energy at reduced rate (breakthrough is harder)
-            this.plant.core.energy[soilIndex] = this.plant.core.energy[index] * 0.4;
-            this.plant.core.water[soilIndex] = this.plant.core.water[index] * 0.3;
-
-            // Strengthen the root-stem connection
-            this.reinforceRootStemConnection(x, y, soilIndex, nextActivePixels);
-
-            // Boost energy to help establishment if it's an early stem
-            if (this.plant.plantMetrics.stemHeight < 3) {
-                this.plant.core.energy[soilIndex] = Math.max(this.plant.core.energy[soilIndex], 100);
-            }
-
-            // Mark as connected to ground
-            this.plant.plantConnectivity.connectedToGround[soilIndex] = 1;
-            this.plant.plantConnectivity.checkedThisFrame[soilIndex] = 1;
-
-            // Propagate plant group ID for origin tracking
-            if (this.plant.plantGroups[index]) {
-                const plantGroupId = this.plant.plantGroups[index];
-                this.plant.plantGroups[soilIndex] = plantGroupId;
-
-                // Record the first stem position for this plant group if not already set
-                if (!this.plant.stemOrigins[plantGroupId]) {
-                    this.plant.stemOrigins[plantGroupId] = x;
-                    console.log("Recorded first stem position at x:", x, "for plant:", plantGroupId);
-                }
-            }
-
-            nextActivePixels.add(soilIndex);
-        } else {
-            // Failed penetration attempt
-            // Still consume some energy but at a reduced rate
-            this.plant.core.energy[index] = Math.max(5, this.plant.core.energy[index] - 5);
-            nextActivePixels.add(index);
-        }
-    },
-
-    // Create a new stem from a root when there's air above
-    createStemFromRoot: function(x, y, index, upIndex, nextActivePixels) {
-        // Create stem pixel with reinforced connection to root
-        this.plant.core.type[upIndex] = this.plant.TYPE.PLANT;
-        this.plant.core.state[upIndex] = this.plant.STATE.STEM;
-
-        // Transfer some energy and water to the stem
-        this.plant.core.energy[upIndex] = this.plant.core.energy[index] * 0.6; // Increased energy transfer
-        this.plant.core.energy[index] = this.plant.core.energy[index] * 0.6;
-
-        this.plant.core.water[upIndex] = this.plant.core.water[index] * 0.6;
-        this.plant.core.water[index] = this.plant.core.water[index] * 0.6;
-
-        // Strengthen the root-stem connection by adding more root pixels around the stem base
-        // This creates a thicker base for better support
-        this.reinforceRootStemConnection(x, y, upIndex, nextActivePixels);
-
-        // Start with more energy to help establishment
-        if (this.plant.plantMetrics.stemHeight < 3) {
-            this.plant.core.energy[upIndex] = Math.max(this.plant.core.energy[upIndex], 120);
-        }
-
-        // Explicitly mark new stem as connected to ground
-        this.plant.plantConnectivity.connectedToGround[upIndex] = 1;
-        this.plant.plantConnectivity.checkedThisFrame[upIndex] = 1;
-
-        // Propagate plant group ID for origin tracking
-        if (this.plant.plantGroups[index]) {
-            const plantGroupId = this.plant.plantGroups[index];
-            this.plant.plantGroups[upIndex] = plantGroupId;
-
-            // Record the first stem position for this plant group if not already set
-            if (!this.plant.stemOrigins[plantGroupId]) {
-                this.plant.stemOrigins[plantGroupId] = x;
-                console.log("Recorded first stem position at x:", x, "for plant:", plantGroupId);
-            }
-        }
-
-        nextActivePixels.add(upIndex);
-    },
-
-    // Count nearby root pixels within a given distance
-    countNearbyRoots: function(x, y, distance) {
-        let count = 0;
-
-        for (let dy = -distance; dy <= distance; dy++) {
-            for (let dx = -distance; dx <= distance; dx++) {
-                // Skip the center pixel
-                if (dx === 0 && dy === 0) continue;
-
-                const nx = x + dx;
-                const ny = y + dy;
-                const index = this.plant.core.getIndex(nx, ny);
-
-                if (index !== -1 &&
-                    this.plant.core.type[index] === this.plant.TYPE.PLANT &&
-                    this.plant.core.state[index] === this.plant.STATE.ROOT) {
-                    // Weight closer roots more heavily
-                    const dist = Math.sqrt(dx*dx + dy*dy);
-                    if (dist <= distance) {
-                        count += 1 + (distance - dist) / distance;
-                    }
-                }
-            }
-        }
-
-        return count;
-    },
-
-    // Count nearby roots that are connected to ground
-    countConnectedRoots: function(x, y, distance) {
-        let count = 0;
-
-        for (let dy = -distance; dy <= distance; dy++) {
-            for (let dx = -distance; dx <= distance; dx++) {
-                // Skip the center pixel
-                if (dx === 0 && dy === 0) continue;
-
-                const nx = x + dx;
-                const ny = y + dy;
-                const index = this.plant.core.getIndex(nx, ny);
-
-                if (index !== -1 &&
-                    this.plant.core.type[index] === this.plant.TYPE.PLANT &&
-                    this.plant.core.state[index] === this.plant.STATE.ROOT &&
-                    this.plant.plantConnectivity.connectedToGround[index]) {
-                    // Weight closer roots more heavily
-                    const dist = Math.sqrt(dx*dx + dy*dy);
-                    if (dist <= distance) {
-                        count += 1 + (distance - dist) / distance;
-                    }
-                }
-            }
-        }
-
-        return count;
-    },
-
-    // Reinforce the connection between roots and stems for structural integrity
-    // This is the most critical part of the plant structure
-    reinforceRootStemConnection: function(rootX, rootY, stemIndex, nextActivePixels) {
-        // Get stem coordinates
-        const stemCoords = this.plant.core.getCoords(stemIndex);
-
-        // We'll try to create supporting root structures around the stem base
-        // Using a wider array of possible positions to create a more robust connection
-        const possiblePositions = [
-            {dx: -1, dy: 0, priority: 5},  // Left (high priority)
-            {dx: 1, dy: 0, priority: 5},   // Right (high priority)
-            {dx: -1, dy: 1, priority: 4},  // Bottom-left (high priority)
-            {dx: 1, dy: 1, priority: 4},   // Bottom-right (high priority)
-            {dx: 0, dy: 1, priority: 3},   // Bottom (medium priority)
-            {dx: -2, dy: 0, priority: 2},  // Far left (lower priority)
-            {dx: 2, dy: 0, priority: 2},   // Far right (lower priority)
-            {dx: -2, dy: 1, priority: 1},  // Far bottom-left (lowest priority)
-            {dx: 2, dy: 1, priority: 1}    // Far bottom-right (lowest priority)
-        ];
-
-        // Sort positions by priority
-        possiblePositions.sort((a, b) => b.priority - a.priority);
-
-        // Try to create more additional root pixels around the stem base
-        // Increased from 2 to 4 for stronger support
-        let addedRoots = 0;
-        const maxRoots = 4;
-
-        for (const pos of possiblePositions) {
-            // Skip after creating enough support
-            if (addedRoots >= 2) break;
-
-            const nx = rootX + pos.dx;
-            const ny = rootY + pos.dy;
-            const newIndex = this.plant.core.getIndex(nx, ny);
-
-            // Check if this position is soil and can be converted to root
-            if (newIndex !== -1 && this.plant.core.type[newIndex] === this.plant.TYPE.SOIL) {
-                // Convert soil to root with 50% chance (randomized for natural appearance)
-                if (Math.random() < 0.5) {
-                    // Create a new root pixel for better support
-                    this.plant.core.type[newIndex] = this.plant.TYPE.PLANT;
-                    this.plant.core.state[newIndex] = this.plant.STATE.ROOT;
-
-                    // Give it some energy and water
-                    this.plant.core.energy[newIndex] = this.plant.core.energy[stemIndex] * 0.5;
-                    this.plant.core.water[newIndex] = this.plant.core.water[stemIndex] * 0.5;
-
-                    // Mark as connected to ground
-                    this.plant.plantConnectivity.connectedToGround[newIndex] = 1;
-                    this.plant.plantConnectivity.checkedThisFrame[newIndex] = 1;
-
-                    // Add to root indices for better tracking
-                    this.plant.plantConnectivity.rootIndices.push(newIndex);
-
-                    nextActivePixels.add(newIndex);
-                    addedRoots++;
-                }
             }
         }
     },

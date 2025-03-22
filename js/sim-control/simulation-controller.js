@@ -18,6 +18,13 @@ const SimulationController = {
     // Runtime state
     running: false,
     simulationSpeed: 1,
+    
+    // Time step control
+    fixedTimeStepEnabled: true,
+    fixedTimeStep: 1000 / 60, // 60 updates per second - back to normal refresh rate
+    maxCatchUpIterations: 1, // Only do one simulation update per frame, never try to "catch up"
+    lastUpdateTime: 0,
+    accumulatedTime: 0,
 
     // Active pixel tracking
     activePixels: null,
@@ -73,6 +80,9 @@ const SimulationController = {
 
         // Initialize environmental-biological connections
         this.ecosystemBalancer.initializeEnvironmentalConnections();
+        
+        // Initialize timing variables
+        this.lastUpdateTime = performance.now();
 
         console.log("Simulation initialization complete.");
         return this;
@@ -117,9 +127,12 @@ const SimulationController = {
         console.log("Starting simulation...");
         this.running = true;
         this.performanceManager.resetTiming();
+        this.lastUpdateTime = performance.now();
+        this.accumulatedTime = 0;
+        
         // Only start animation frame if speed is positive
         if (this.simulationSpeed > 0) {
-            requestAnimationFrame(() => this.update());
+            requestAnimationFrame(() => this.animationFrame());
         }
     },
 
@@ -162,37 +175,54 @@ const SimulationController = {
 
         // Don't automatically start the simulation after reset
     },
-
-    // Main update loop
-    update: function() {
+    
+    // Animation frame - decoupled from update logic
+    animationFrame: function() {
         if (!this.running) return;
-
+        
+        // Calculate delta time
+        const currentTime = performance.now();
+        let deltaTime = currentTime - this.lastUpdateTime;
+        this.lastUpdateTime = currentTime;
+        
+        // Prevent spiral of death - cap delta time at 50ms
+        if (deltaTime > 50) {
+            deltaTime = 50;
+        }
+        
         // Track performance
         this.performanceManager.startFrame();
-
-        // Track pixels that will become active next frame
-        const nextActivePixels = new Set();
-
-        // Run multiple update steps based on speed setting
-        for (let i = 0; i < this.simulationSpeed && this.running; i++) {
-            // Periodically update environmental-biological connections
-            if (i === 0 && Math.random() < 0.01) {
-                this.ecosystemBalancer.updateBiologicalRates();
+        
+        if (this.fixedTimeStepEnabled) {
+            // Fixed time step update logic - simplified to be more stable
+            // Apply simulation speed to how fast time accumulates
+            this.accumulatedTime += deltaTime * this.simulationSpeed; 
+            
+            // Only do at most one update per frame to keep rendering smooth
+            if (this.accumulatedTime >= this.fixedTimeStep) {
+                // When using speed > 1, allow up to speed number of updates
+                // but still limit to prevent freezes
+                let updatesThisFrame = 0;
+                const maxUpdates = Math.min(this.simulationSpeed, 3); // Never do more than 3 updates per frame
+                
+                while (this.accumulatedTime >= this.fixedTimeStep && updatesThisFrame < maxUpdates) {
+                    this.updateSimulation();
+                    this.accumulatedTime -= this.fixedTimeStep;
+                    updatesThisFrame++;
+                }
+                
+                // If we're still behind after max updates, clamp to avoid spiraling
+                if (this.accumulatedTime > this.fixedTimeStep * 2) {
+                    this.accumulatedTime = this.fixedTimeStep;
+                }
             }
-
-            // Update each system in order:
-            this.environment.update(this.activePixels, nextActivePixels);
-            this.physics.update(this.activePixels, nextActivePixels);
-            this.biology.update(this.activePixels, nextActivePixels);
-
-            // Manage active pixels with performance considerations
-            this.performanceManager.manageActivePixels(nextActivePixels);
-
-            // Update active pixels for next iteration
-            this.activePixels = new Set(nextActivePixels);
-            nextActivePixels.clear();
+        } else {
+            // Variable time step mode
+            for (let i = 0; i < this.simulationSpeed; i++) {
+                this.updateSimulation();
+            }
         }
-
+        
         // End timing for this frame
         this.performanceManager.endFrame();
 
@@ -202,9 +232,69 @@ const SimulationController = {
         // Render
         this.rendering.render();
 
-        // Schedule next update only if still running
+        // Schedule next frame only if still running
         if (this.running && this.simulationSpeed > 0) {
-            requestAnimationFrame(() => this.update());
+            requestAnimationFrame(() => this.animationFrame());
+        }
+    },
+
+    // The actual simulation update, separate from timing logic
+    updateSimulation: function() {
+        if (!this.running) return;
+
+        // Track pixels that will become active next frame
+        const nextActivePixels = new Set();
+
+        // Periodically update environmental-biological connections
+        if (Math.random() < 0.01) {
+            this.ecosystemBalancer.updateBiologicalRates();
+        }
+
+        // Update each system in order:
+        this.environment.update(this.activePixels, nextActivePixels);
+        this.physics.update(this.activePixels, nextActivePixels);
+        this.biology.update(this.activePixels, nextActivePixels);
+
+        // Mark all active and new active pixels as dirty for rendering
+        this.markDirtyPixels(this.activePixels);
+        this.markDirtyPixels(nextActivePixels);
+
+        // Manage active pixels with performance considerations
+        this.performanceManager.manageActivePixels(nextActivePixels);
+
+        // Update active pixels for next iteration
+        this.activePixels = new Set(nextActivePixels);
+        nextActivePixels.clear();
+    },
+
+    // Mark a set of pixels as dirty for rendering
+    markDirtyPixels: function(pixelSet) {
+        if (!this.rendering) return;
+        
+        // Don't try to mark too many pixels - use sampling if set is very large
+        const setSizeThreshold = 10000;
+        
+        if (pixelSet.size > setSizeThreshold) {
+            // Use sampling for large sets
+            let markCount = 0;
+            const samplingRate = Math.max(1, Math.floor(pixelSet.size / setSizeThreshold));
+            
+            let i = 0;
+            for (const index of pixelSet) {
+                if (i % samplingRate === 0) {
+                    this.rendering.markPixelDirty(index);
+                    markCount++;
+                }
+                i++;
+                
+                // Safety limit - don't mark too many
+                if (markCount >= setSizeThreshold) break;
+            }
+        } else {
+            // Mark all pixels for smaller sets
+            pixelSet.forEach(index => {
+                this.rendering.markPixelDirty(index);
+            });
         }
     }
 };

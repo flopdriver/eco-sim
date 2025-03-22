@@ -206,6 +206,10 @@
                     <input type="range" id="speed-slider" min="1" max="10" value="1" class="mini-slider">
                     <span id="speed-value">1x</span>
                 </div>
+                <div class="toggle-control mini">
+                    <label for="fixed-time-step-toggle">Fixed FPS</label>
+                    <input type="checkbox" id="fixed-time-step-toggle" checked>
+                </div>
             </div>
         </div>
         
@@ -261,6 +265,7 @@
 <script src="js/biology/worm-system.js"></script>
 <script src="js/biology/decomposition-system.js"></script>
 <script src="js/biology/biology-system.js"></script>
+<script src="js/biology/evolution-system.js"></script>
 <!-- End of biology system components -->
 
 <!-- User interaction components -->
@@ -277,7 +282,7 @@
 <script src="js/rendering/color-mapper.js"></script>
 <script src="js/rendering/webgl-renderer-core.js"></script>
 <script src="js/rendering/webgl-renderer-interface.js"></script>
-    <script src="js/rendering/zoom-controller.js"></script>
+<script src="js/rendering/zoom-controller.js"></script>
 <!-- End of WebGL Rendering System Components -->
 
 <!-- Simulation controller components -->
@@ -374,8 +379,8 @@
                 
                 // Set visualization mode
                 const mode = button.getAttribute('data-mode');
-                if (window.ecosim && window.ecosim.rendering) {
-                    window.ecosim.rendering.setVisualizationMode(mode);
+                if (window.ecosim && window.ecosim.userInteraction && window.ecosim.userInteraction.visualizationSystem) {
+                    window.ecosim.userInteraction.visualizationSystem.setVisualizationMode(mode);
                 }
             });
         });

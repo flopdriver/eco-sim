@@ -247,5 +247,15 @@ const AirDynamicsSystem = {
     // Get soil height at a specific x coordinate
     getSoilHeight: function(x) {
         return this.physics.core.getSoilHeight(x, this.frameCount);
+    },
+    
+    // Check if a position is at the soil-air boundary
+    isAtSoilAirBoundary: function(x, y) {
+        return this.physics.core.isAtSoilAirBoundary(x, y, this.frameCount);
+    },
+    
+    // Get position relative to soil line
+    getSoilLinePosition: function(x, y) {
+        return this.physics.core.getSoilLinePosition(x, y, this.frameCount);
     }
 };

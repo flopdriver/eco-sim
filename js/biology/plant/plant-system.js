@@ -271,11 +271,11 @@ window.PlantSystem = {
                 
                 const coords = this.core.getCoords(index);
                 
-                // Get the actual soil height at this x coordinate
-                const groundLevel = this.getSoilHeight(coords.x);
+                // Use the core's soil line position checker
+                const soilLinePosition = this.core.getSoilLinePosition(coords.x, coords.y, this.frameCount);
                 
-                // Check if root is at or below ground level
-                if (coords.y >= groundLevel) {
+                // Check if root is at the soil line or below ground level
+                if (soilLinePosition >= 0) {
                     // Make sure this root is in contact with soil to count as grounded
                     const neighbors = this.core.getNeighborIndices(coords.x, coords.y);
                     let touchingSoil = false;

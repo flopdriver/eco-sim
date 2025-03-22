@@ -14,11 +14,11 @@ const SoilMoistureSystem = {
     
     // Drainage rates for different soil types (higher = faster water movement)
     soilDrainageRates: {
-        DEFAULT: 1.0,    // Standard soil
-        CLAY: 0.4,       // Clay drains slowly
-        SANDY: 2.5,      // Sandy soil drains quickly
-        LOAMY: 1.5,      // Loamy soil has good drainage
-        ROCKY: 1.8       // Rocky soil has fast drainage but low retention
+        DEFAULT: 1.2,    // Standard soil - Increased from 1.0 to 1.2
+        CLAY: 0.5,       // Clay drains slowly - Increased from 0.4 to 0.5
+        SANDY: 2.2,      // Sandy soil drains quickly - Decreased from 2.5 to 2.2
+        LOAMY: 1.6,      // Loamy soil has good drainage - Increased from 1.5 to 1.6
+        ROCKY: 1.7       // Rocky soil has fast drainage but low retention - Decreased from 1.8 to 1.7
     },
 
     // Soil layer probabilities by depth (starting from ground level)
@@ -26,27 +26,27 @@ const SoilMoistureSystem = {
     soilLayerProbabilities: [
         // Topsoil (0-10 depth units)
         {
-            DEFAULT: 0.2,
-            LOAMY: 0.6,
-            SANDY: 0.15,
+            DEFAULT: 0.15,  // Decreased from 0.2 to 0.15
+            LOAMY: 0.7,    // Increased from 0.6 to 0.7
+            SANDY: 0.1,    // Decreased from 0.15 to 0.1
             CLAY: 0.05,
             ROCKY: 0.0
         },
         // Subsoil (10-30 depth units)
         {
-            DEFAULT: 0.1,
-            LOAMY: 0.4,
-            SANDY: 0.25,
-            CLAY: 0.2,
+            DEFAULT: 0.05,  // Decreased from 0.1 to 0.05
+            LOAMY: 0.55,   // Increased from 0.4 to 0.55
+            SANDY: 0.2,    // Decreased from 0.25 to 0.2
+            CLAY: 0.15,    // Decreased from 0.2 to 0.15
             ROCKY: 0.05
         },
         // Deep soil (30+ depth units)
         {
             DEFAULT: 0.05,
-            LOAMY: 0.15,
-            SANDY: 0.3,
-            CLAY: 0.2,
-            ROCKY: 0.3
+            LOAMY: 0.25,   // Increased from 0.15 to 0.25
+            SANDY: 0.25,   // Decreased from 0.3 to 0.25
+            CLAY: 0.25,    // Increased from 0.2 to 0.25
+            ROCKY: 0.2     // Decreased from 0.3 to 0.2
         }
     ],
 
@@ -59,13 +59,18 @@ const SoilMoistureSystem = {
 
     // Determine soil layer type based on position and depth
     determineSoilLayer: function(x, y) {
-        // Calculate ground level and depth using actual soil line
-        const groundLevel = this.physics.core.getSoilHeight(x, this.frameCount);
-        const depthFromSurface = y - groundLevel;
+        // Use the core's soil line position checker
+        const soilLinePosition = this.physics.core.getSoilLinePosition(x, y, this.frameCount);
+        
+        // Check if we're at the soil-air boundary
+        const isAtSoilLine = this.physics.core.isAtSoilAirBoundary(x, y, this.frameCount);
+        
+        // Calculate depth from soil surface
+        const depthFromSurface = soilLinePosition > 0 ? soilLinePosition : 0;
         
         // Get appropriate probability distribution based on depth
         let probabilities;
-        if (depthFromSurface < 10) {
+        if (isAtSoilLine || depthFromSurface < 10) {
             probabilities = this.soilLayerProbabilities[0]; // Topsoil
         } else if (depthFromSurface < 30) {
             probabilities = this.soilLayerProbabilities[1]; // Subsoil
@@ -148,13 +153,31 @@ const SoilMoistureSystem = {
         
         // Process only wet soil pixels
         activePixels.forEach(index => {
-            if (this.physics.core.type[index] === this.physics.TYPE.SOIL &&
-                this.physics.core.water[index] > 20) {
-
+            if (this.physics.core.type[index] === this.physics.TYPE.SOIL) {
+                // Process all soil, not just those with water > 20
                 const coords = this.physics.core.getCoords(index);
                 this.updateSingleSoilMoisture(coords.x, coords.y, index, nextActivePixels);
             }
         });
+
+        // Ensure soil moisture is propagated even for non-active pixels
+        if (this.frameCount % 30 === 0) {
+            // Periodic check of all soil pixels for water movement
+            for (let y = 0; y < this.physics.core.height; y++) {
+                // Process every 5th column to spread the work over frames
+                for (let x = this.frameCount % 5; x < this.physics.core.width; x += 5) {
+                    const index = this.physics.core.getIndex(x, y);
+                    if (index !== -1 && 
+                        this.physics.core.type[index] === this.physics.TYPE.SOIL && 
+                        this.physics.core.water[index] > 5 &&
+                        !activePixels.has(index)) {
+                        
+                        // Trigger updates for wet soil that's not active
+                        this.updateSingleSoilMoisture(x, y, index, nextActivePixels);
+                    }
+                }
+            }
+        }
     },
 
     // Update a single soil moisture pixel
@@ -222,6 +245,7 @@ const SoilMoistureSystem = {
                 this.updateSoilState(index);
 
                 nextActivePixels.add(downIndex);
+                nextActivePixels.add(index); // Keep this pixel active too
             }
         }
 
@@ -334,20 +358,26 @@ const SoilMoistureSystem = {
             currentState === this.physics.STATE.LOAMY ||
             currentState === this.physics.STATE.ROCKY;
 
-        // Don't override existing special soil types with basic WET/DRY states
+        // Don't override special soil types like FERTILE, but do update WET/DRY states
         if (!isSoilLayer && currentState !== this.physics.STATE.FERTILE) {
             if (waterLevel > 20) {
                 this.physics.core.state[index] = this.physics.STATE.WET;
             } else {
                 this.physics.core.state[index] = this.physics.STATE.DRY;
             }
+        }
 
-            // Check for heavily compacted soil
-            if (nutrientLevel > 180) {
-                // Highly compacted soil has a chance to become fertile
-                if (Math.random() < 0.05) {
-                    this.physics.core.state[index] = this.physics.STATE.FERTILE;
-                }
+        // Special handling for very wet soil - ensure it's properly marked
+        if (waterLevel > 60 && currentState !== this.physics.STATE.FERTILE) {
+            // Very wet soil, even if it's a special soil type, should be marked
+            this.physics.core.state[index] = this.physics.STATE.WET;
+        }
+
+        // Check for heavily compacted soil that might become fertile
+        if (nutrientLevel > 180 && currentState !== this.physics.STATE.FERTILE) {
+            // Highly compacted soil has a chance to become fertile
+            if (Math.random() < 0.05) {
+                this.physics.core.state[index] = this.physics.STATE.FERTILE;
             }
         }
     }

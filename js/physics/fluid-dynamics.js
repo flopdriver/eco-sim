@@ -6,20 +6,20 @@ const FluidDynamicsSystem = {
     physics: null,
 
     // Configuration constants
-    WATER_FLOW_RATE: 30.5,            // Flow speed multiplier
-    WATER_EMERGENCY_THRESHOLD: 10000,  // Trigger drainage when this many water pixels exist
+    WATER_FLOW_RATE: 45.5,            // Flow speed multiplier
+    WATER_EMERGENCY_THRESHOLD: 100000,  // Trigger drainage when this many water pixels exist
 
     // Water transfer amounts
-    VERTICAL_TRANSFER_DIVIDER: 4,     // Higher number = slower vertical flow
-    HORIZONTAL_TRANSFER_DIVIDER: 2,   // Higher number = slower horizontal flow
+    VERTICAL_TRANSFER_DIVIDER: 1.8,     // Higher number = slower vertical flow
+    HORIZONTAL_TRANSFER_DIVIDER: 1.8,   // Higher number = slower horizontal flow
 
     // Evaporation probabilities
-    SURFACE_EVAPORATION_THRESHOLD: 10, // Stuck counter that increases evaporation chance
-    ABOVE_GROUND_EVAPORATION_THRESHOLD: 20,
-    BELOW_GROUND_ABSORPTION_THRESHOLD: 30,
+    SURFACE_EVAPORATION_THRESHOLD: 30, // Stuck counter that increases evaporation chance
+    ABOVE_GROUND_EVAPORATION_THRESHOLD: 60,
+    BELOW_GROUND_ABSORPTION_THRESHOLD: 25,
 
     // Soil absorption rates
-    MIN_TRANSFER_AMOUNT: 10,
+    MIN_TRANSFER_AMOUNT: 25,
     SHALLOW_SOIL_WATER_CAPACITY: 9999, // "Infinite" absorption for surface soil
 
     // Current frame count for timing operations
@@ -99,10 +99,14 @@ const FluidDynamicsSystem = {
             this.physics.core.type[index] = this.physics.TYPE.AIR;
             this.physics.core.water[index] = 0;
         } else {
-            // Below ground - convert to soil
+            // Below ground - convert to soil instead of air
+            // This prevents air bubbles from forming underground
             this.physics.core.type[index] = this.physics.TYPE.SOIL;
             this.physics.core.state[index] = this.physics.STATE.WET;
             this.physics.core.water[index] = Math.min(255, this.physics.core.water[index]);
+            if (this.physics.core.water[index] < 10) {
+                this.physics.core.water[index] = 10; // Ensure minimum water content
+            }
             this.physics.core.nutrient[index] = 10; // Some basic nutrients
         }
     },
@@ -177,14 +181,14 @@ const FluidDynamicsSystem = {
     handleEvaporationAndAbsorption: function(index, y, stuckCounter, groundLevel) {
         // Surface water evaporation
         if (y >= groundLevel - 2 && y <= groundLevel + 2) {
-            if (stuckCounter > this.SURFACE_EVAPORATION_THRESHOLD && Math.random() < 0.5) {
+            if (stuckCounter > this.SURFACE_EVAPORATION_THRESHOLD && Math.random() < 0.3) {
                 this.physics.core.type[index] = this.physics.TYPE.AIR;
                 this.physics.core.water[index] = 0;
                 return true;
             }
         }
         // Water above ground evaporation
-        else if (y < groundLevel && stuckCounter > this.ABOVE_GROUND_EVAPORATION_THRESHOLD && Math.random() < 0.05) {
+        else if (y < groundLevel && stuckCounter > this.ABOVE_GROUND_EVAPORATION_THRESHOLD && Math.random() < 0.01) {
             this.physics.core.type[index] = this.physics.TYPE.AIR;
             this.physics.core.water[index] = 0;
             return true;
@@ -260,30 +264,44 @@ const FluidDynamicsSystem = {
     absorbWaterIntoSoil: function(waterIndex, soilIndex, x, y, groundLevel, nextActivePixels) {
         // Determine soil saturation limit based on depth
         const soilCoords = this.physics.core.getCoords(soilIndex);
-        const depthBelowSurface = soilCoords.y - groundLevel;
+        
+        // Check if this is at the soil-air boundary
+        const isAtSoilLine = this.physics.core.isAtSoilAirBoundary(soilCoords.x, soilCoords.y, this.physics.frameCount);
+        
+        // Use the core's soil line position checker instead of just using groundLevel
+        const depthBelowSurface = this.physics.core.getSoilLinePosition(soilCoords.x, soilCoords.y, this.physics.frameCount);
 
         // Surface soil has lower saturation (drains faster), deeper soil has higher capacity
         let soilCapacity = 255;
-        if (depthBelowSurface < 5) {
-            // Top layers of soil have "infinite" absorption (simulates drainage)
-            soilCapacity = this.SHALLOW_SOIL_WATER_CAPACITY;
+        
+        // If at the soil-air boundary or just below it
+        if (isAtSoilLine || depthBelowSurface <= 5) {
+            // Top layers of soil have high absorption but not infinite
+            soilCapacity = Math.min(255, this.SHALLOW_SOIL_WATER_CAPACITY);
         }
 
         // Absorb water if not oversaturated
         if (this.physics.core.water[soilIndex] < soilCapacity) {
-            // Transfer almost all water at once (95-100%)
+            // Transfer amount is a percentage of the water based on soil depth
+            const transferRate = isAtSoilLine ? 0.98 : 0.90;  // Higher transfer at the soil-air boundary
             const transferAmount = Math.max(
-                Math.floor(this.physics.core.water[waterIndex] * 0.95),
-                Math.min(50, this.physics.core.water[waterIndex]) // At least 50 units if possible
+                Math.floor(this.physics.core.water[waterIndex] * transferRate),
+                Math.min(80, this.physics.core.water[waterIndex])
             );
 
-            this.physics.core.water[soilIndex] += transferAmount;
-            this.physics.core.water[waterIndex] -= transferAmount;
-
+            // Ensure we don't exceed soil's capacity
+            const effectiveTransfer = Math.min(transferAmount, soilCapacity - this.physics.core.water[soilIndex]);
+            
+            this.physics.core.water[soilIndex] += effectiveTransfer;
+            this.physics.core.water[waterIndex] -= effectiveTransfer;
+            
             // Update soil states
             if (this.physics.core.water[soilIndex] > 20) {
                 this.physics.core.state[soilIndex] = this.physics.STATE.WET;
             }
+
+            // Make sure soil stays active to continue water propagation
+            nextActivePixels.add(soilIndex);
 
             // If water is depleted or nearly depleted, convert appropriately
             if (this.physics.core.water[waterIndex] <= 2) {
@@ -292,14 +310,16 @@ const FluidDynamicsSystem = {
                 nextActivePixels.add(waterIndex);
             }
 
-            nextActivePixels.add(soilIndex);
             return true;
         }
         // Even if soil is saturated, still try to absorb some water
-        else if (Math.random() < 0.7) {
-            // Simulate drainage by allowing oversaturated soil to still absorb water
-            const drainAmount = Math.min(30, this.physics.core.water[waterIndex]);
+        else {
+            // Soil is saturated, but still allow minimal absorption to prevent water buildup
+            const drainAmount = Math.min(20, this.physics.core.water[waterIndex]);
             this.physics.core.water[waterIndex] -= drainAmount;
+
+            // Keep soil active for water movement
+            nextActivePixels.add(soilIndex);
 
             // If water is depleted, convert appropriately
             if (this.physics.core.water[waterIndex] <= 0) {
@@ -310,8 +330,6 @@ const FluidDynamicsSystem = {
 
             return true;
         }
-
-        return false;
     },
 
     // Handle interaction between water and plants
@@ -319,17 +337,36 @@ const FluidDynamicsSystem = {
         // Different interactions based on plant part
         const plantState = this.physics.core.state[plantIndex];
 
-        // Roots can absorb water without displacement
+        // FIXED: Roots can absorb water without displacement
         if (plantState === this.physics.STATE.ROOT) {
-            if (Math.random() < 0.5) {
+            if (Math.random() < 0.7) { // Increased from 0.5 to 0.7
                 // Roots absorb water without moving the plant
-                const absorbAmount = Math.min(20, this.physics.core.water[waterIndex]);
+                const absorbAmount = Math.min(30, this.physics.core.water[waterIndex] * 0.9); // Absorb 90% rather than all water
                 this.physics.core.water[plantIndex] += absorbAmount;
                 this.physics.core.water[waterIndex] -= absorbAmount;
 
-                // If water is depleted, convert appropriately
-                if (this.physics.core.water[waterIndex] <= 0) {
-                    this.convertWaterByElevation(waterIndex, y, groundLevel);
+                // Only convert water to air/soil if truly depleted
+                // Leave a minimum amount of water to prevent air bubble creation
+                if (this.physics.core.water[waterIndex] <= 5) {
+                    // Instead of converting to air, maintain as water with minimum value
+                    // This prevents air bubbles from forming underground
+                    if (y >= groundLevel) {
+                        // Below ground - ensure it stays as water or converts to wet soil
+                        if (Math.random() < 0.3) {
+                            // Convert to wet soil sometimes
+                            this.physics.core.type[waterIndex] = this.physics.TYPE.SOIL;
+                            this.physics.core.state[waterIndex] = this.physics.STATE.WET;
+                            this.physics.core.water[waterIndex] = 10; // Minimum water content
+                            this.physics.core.nutrient[waterIndex] = 10; // Some basic nutrients
+                        } else {
+                            // Keep as water with minimum value
+                            this.physics.core.water[waterIndex] = 5;
+                        }
+                    } else {
+                        // Above ground - normal conversion to air is okay
+                        this.physics.core.type[waterIndex] = this.physics.TYPE.AIR;
+                        this.physics.core.water[waterIndex] = 0;
+                    }
                 }
 
                 // Activate both pixels
@@ -338,12 +375,12 @@ const FluidDynamicsSystem = {
                 return true;
             }
         }
-        // Stems can absorb water or let it pass through
+        // FIXED: Stems can absorb water or let it pass through
         else if (plantState === this.physics.STATE.STEM) {
             // Check if stem needs water (has room for more)
-            if (this.physics.core.water[plantIndex] < 150 && Math.random() < 0.4) {
+            if (this.physics.core.water[plantIndex] < 180 && Math.random() < 0.5) { // Increased from 150 to 180, and 0.4 to 0.5
                 // Stems can absorb water directly
-                const absorbAmount = Math.min(15, this.physics.core.water[waterIndex]);
+                const absorbAmount = Math.min(20, this.physics.core.water[waterIndex]); // Increased from 15 to 20
                 this.physics.core.water[plantIndex] += absorbAmount;
                 this.physics.core.water[waterIndex] -= absorbAmount;
 
@@ -357,8 +394,8 @@ const FluidDynamicsSystem = {
                 nextActivePixels.add(plantIndex);
                 return true;
             }
-            // Water can occasionally pass through stems
-            else if (Math.random() < 0.05) {
+            // FIXED: Water can occasionally pass through stems
+            else if (Math.random() < 0.08) { // Increased from 0.05 to 0.08
                 // Get the pixel below the stem
                 const belowStemIndex = this.physics.core.getIndex(x, y + 2);
                 if (belowStemIndex !== -1 &&
@@ -385,14 +422,14 @@ const FluidDynamicsSystem = {
                 }
             }
         }
-        // Leaves absorb water but block it from passing through
+        // FIXED: Leaves absorb water but block it from passing through
         else if (plantState === this.physics.STATE.LEAF) {
             // Check if leaf needs water
-            if (this.physics.core.water[plantIndex] < 120) {
+            if (this.physics.core.water[plantIndex] < 150) { // Increased from 120 to 150
                 // Leaves can absorb water with high probability
-                if (Math.random() < 0.35) {
+                if (Math.random() < 0.45) { // Increased from 0.35 to 0.45
                     // Absorb a significant amount of water
-                    const absorbAmount = Math.min(10, this.physics.core.water[waterIndex]);
+                    const absorbAmount = Math.min(15, this.physics.core.water[waterIndex]); // Increased from 10 to 15
                     this.physics.core.water[plantIndex] += absorbAmount;
                     this.physics.core.water[waterIndex] -= absorbAmount;
 
@@ -402,10 +439,10 @@ const FluidDynamicsSystem = {
                     }
                 }
                 // Smaller chance for minimal absorption (like dew on leaf)
-                else if (Math.random() < 0.3) {
+                else if (Math.random() < 0.4) { // Increased from 0.3 to 0.4
                     // Minimal water transfer
-                    this.physics.core.water[plantIndex] += 2;
-                    this.physics.core.water[waterIndex] -= 2;
+                    this.physics.core.water[plantIndex] += 4; // Increased from 2 to 4
+                    this.physics.core.water[waterIndex] -= 4; // Increased from 2 to 4
 
                     if (this.physics.core.water[waterIndex] <= 0) {
                         this.convertWaterByElevation(waterIndex, y, groundLevel);
@@ -426,7 +463,7 @@ const FluidDynamicsSystem = {
     // Handle horizontal water spread
     handleHorizontalSpread: function(index, x, y, stuckCounter, groundLevel, nextActivePixels) {
         // Enhance horizontal spread near ground
-        const isNearGround = y >= groundLevel - 5;
+        const isNearGround = y >= groundLevel - 8; // Increased range from groundLevel - 5
 
         // Randomize whether we check left or right first
         const checkLeftFirst = Math.random() < 0.5;
@@ -439,6 +476,17 @@ const FluidDynamicsSystem = {
         if (isNearGround) {
             let movedLeft = false;
             let movedRight = false;
+
+            // Check downward movement chance first to encourage ground penetration
+            const downIndex = this.physics.core.getIndex(x, y + 1);
+            if (downIndex !== -1 && Math.random() < 0.8) { // High chance to check downward movement again
+                const belowType = this.physics.core.type[downIndex];
+                if (belowType === this.physics.TYPE.SOIL) {
+                    if (this.absorbWaterIntoSoil(index, downIndex, x, y, groundLevel, nextActivePixels)) {
+                        return true;
+                    }
+                }
+            }
 
             movedLeft = this.tryMoveWaterHorizontal(index, leftIndex, nextActivePixels, groundLevel);
 
@@ -547,64 +595,60 @@ const FluidDynamicsSystem = {
     tryMoveWaterHorizontal: function(fromIndex, toIndex, nextActivePixels, groundLevel) {
         if (toIndex === -1) return false;
 
-        // Get position info for ground checking
-        const coords = this.physics.core.getCoords(fromIndex);
-        const isBelowGround = coords.y >= groundLevel;
-
-        // Can only move into air
-        if (this.physics.core.type[toIndex] === this.physics.TYPE.AIR) {
-            // Get stuck counter to help unstick water
-            const stuckCounter = this.physics.core.metadata[fromIndex] || 0;
-
-            // Check if water is at ground level
-            const horizCoords = this.physics.core.getCoords(fromIndex);
-            const horizontalGroundLevel = Math.floor(this.physics.core.height * 0.6);
-            const isNearGround = horizCoords.y >= horizontalGroundLevel - 5;
-
-            // Water can spread horizontally if:
-            // 1. It has enough water level, OR
-            // 2. It's been stuck for a while, OR
-            // 3. It's at ground level
-            if (this.physics.core.water[fromIndex] > 4 || stuckCounter > 3 || isNearGround) {
-                // Ground level spreads more water
-                const transferRatio = isNearGround ? 0.9 : // 90% at ground
-                    (stuckCounter > 6 ? 0.8 : 0.5); // Otherwise use stuck counter
-
-                // Calculate transfer amount
-                const transferAmount = Math.floor(this.physics.core.water[fromIndex] * transferRatio);
-
+        const toType = this.physics.core.type[toIndex];
+        
+        // Check if we can move into this cell
+        if (toType === this.physics.TYPE.AIR) {
+            const fromCoords = this.physics.core.getCoords(fromIndex);
+            const toCoords = this.physics.core.getCoords(toIndex);
+            
+            // Calculate water amount to transfer (more aggressive near ground)
+            const isNearGround = fromCoords.y >= groundLevel - 5;
+            const transferAmount = isNearGround 
+                ? Math.floor(this.physics.core.water[fromIndex] / 1.5) // More aggressive transfer near ground
+                : Math.floor(this.physics.core.water[fromIndex] / this.HORIZONTAL_TRANSFER_DIVIDER);
+            
+            if (transferAmount >= this.MIN_TRANSFER_AMOUNT) {
+                // Create new water in target cell
                 this.physics.core.type[toIndex] = this.physics.TYPE.WATER;
                 this.physics.core.water[toIndex] = transferAmount;
+                
+                // Remove water from source cell
                 this.physics.core.water[fromIndex] -= transferAmount;
-
-                // Reset stuck counter for the new water
-                this.physics.core.metadata[toIndex] = 0;
-
-                // If source water is too low, convert based on location
-                if (this.physics.core.water[fromIndex] <= 1) {
-                    if (isBelowGround) {
-                        // Below ground - convert to soil
+                
+                // If source is depleted, convert to air
+                if (this.physics.core.water[fromIndex] <= 5) {
+                    // Get coordinates to check if we're underground
+                    const coords = this.physics.core.getCoords(fromIndex);
+                    const groundLevel = this.getGroundLevel(coords.x);
+                    
+                    if (coords.y >= groundLevel) {
+                        // Underground - convert to wet soil instead of air
                         this.physics.core.type[fromIndex] = this.physics.TYPE.SOIL;
                         this.physics.core.state[fromIndex] = this.physics.STATE.WET;
-                        this.physics.core.water[fromIndex] = 15;
-                        this.physics.core.nutrient[fromIndex] = 10;
+                        this.physics.core.water[fromIndex] = 10; // Minimum water
+                        this.physics.core.nutrient[fromIndex] = 10; // Some nutrients
                     } else {
                         // Above ground - convert to air
                         this.physics.core.type[fromIndex] = this.physics.TYPE.AIR;
                         this.physics.core.water[fromIndex] = 0;
                     }
-                } else {
-                    // Reset stuck counter for remaining water too
-                    this.physics.core.metadata[fromIndex] = 0;
-                    nextActivePixels.add(fromIndex);
                 }
-
+                
+                // Mark both cells active
                 this.physics.processedThisFrame[toIndex] = 1;
+                nextActivePixels.add(fromIndex);
                 nextActivePixels.add(toIndex);
+                
                 return true;
             }
+        } 
+        // Enhanced soil absorption when water is moving horizontally near soil
+        else if (toType === this.physics.TYPE.SOIL && Math.random() < 0.6) { // Increased from default probability
+            const fromCoords = this.physics.core.getCoords(fromIndex);
+            return this.absorbWaterIntoSoil(fromIndex, toIndex, fromCoords.x, fromCoords.y, groundLevel, nextActivePixels);
         }
-
+        
         return false;
     },
 
@@ -636,15 +680,17 @@ const FluidDynamicsSystem = {
                 if (isBelowGround) {
                     this.physics.core.type[fromIndex] = this.physics.TYPE.SOIL;
                     this.physics.core.state[fromIndex] = this.physics.STATE.WET;
-                    this.physics.core.water[fromIndex] = 15;
-                    this.physics.core.nutrient[fromIndex] = 10;
+                    this.physics.core.water[fromIndex] = 10; // Minimum water to prevent air bubbles
+                    this.physics.core.nutrient[fromIndex] = 5; // Minimal nutrients
                 } else {
                     this.physics.core.type[fromIndex] = this.physics.TYPE.AIR;
                     this.physics.core.water[fromIndex] = 0;
                 }
 
-                this.physics.processedThisFrame[toIndex] = 1;
+                // Activate both cells
+                nextActivePixels.add(fromIndex);
                 nextActivePixels.add(toIndex);
+
                 return true;
             }
         }
