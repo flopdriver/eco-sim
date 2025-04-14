@@ -29,6 +29,7 @@ export const GravitySystem = {
                 type === this.physics.TYPE.SEED ||
                 type === this.physics.TYPE.DEAD_MATTER ||
                 type === this.physics.TYPE.WORM ||
+                type === this.physics.TYPE.SOIL ||
                 (type === this.physics.TYPE.INSECT && (this.physics.core.metadata[index] > 8 || Math.random() < 0.6)) // Increased insect falling chance
             );
 
@@ -141,6 +142,7 @@ export const GravitySystem = {
         // (but only if it's a type that should keep trying)
         if (this.physics.core.type[index] === this.physics.TYPE.SEED ||
             this.physics.core.type[index] === this.physics.TYPE.DEAD_MATTER ||
+            this.physics.core.type[index] === this.physics.TYPE.SOIL ||
             this.physics.core.type[index] === this.physics.TYPE.INSECT) {
             nextActivePixels.add(index);
         }
@@ -154,23 +156,40 @@ export const GravitySystem = {
         
         if (downIndex === -1) return false;
         
-        // Can fall into air, water, or (for seeds) sometimes into soil
-        if (this.physics.core.type[downIndex] === this.physics.TYPE.AIR ||
-            (this.physics.core.type[downIndex] === this.physics.TYPE.WATER &&
-                this.physics.core.type[index] !== this.physics.TYPE.INSECT) ||
-            (this.physics.core.type[index] === this.physics.TYPE.SEED && 
-                this.physics.core.type[downIndex] === this.physics.TYPE.SOIL && 
-                // Only allow seeds to dig into the top layer of soil
-                this.getDepthInSoil(x, y) < 3 &&
-                Math.random() < 0.08)) { // Reduced chance to fall into soil so more seeds stay on surface
-            
+        const currentType = this.physics.core.type[index];
+        const targetType = this.physics.core.type[downIndex];
+
+        // Define conditions for falling based on current type
+        let canFall = false;
+
+        if (currentType === this.physics.TYPE.SOIL) {
+            // Soil can fall into Air or Water
+            canFall = (targetType === this.physics.TYPE.AIR || targetType === this.physics.TYPE.WATER);
+        } else if (currentType === this.physics.TYPE.SEED) {
+            // Seeds fall into Air, Water, or shallow Soil
+            canFall = (targetType === this.physics.TYPE.AIR || 
+                       targetType === this.physics.TYPE.WATER ||
+                       (targetType === this.physics.TYPE.SOIL && 
+                        this.getDepthInSoil(x, y) < 3 && 
+                        Math.random() < 0.08));
+        } else if (currentType === this.physics.TYPE.INSECT) {
+             // Insects fall only into Air (or other specific insect logic)
+            canFall = (targetType === this.physics.TYPE.AIR);
+        } else {
+            // Default: Dead Matter, Worms fall into Air or Water
+             canFall = (targetType === this.physics.TYPE.AIR || targetType === this.physics.TYPE.WATER);
+        }
+
+        // If conditions are met, swap pixels
+        if (canFall) {
             // Swap positions using core function for cleaner code
             this.physics.core.swapPixels(index, downIndex);
             
             // Mark both positions as active
             nextActivePixels.add(downIndex);
             if (this.physics.core.type[index] !== this.physics.TYPE.AIR) {
-                nextActivePixels.add(index);
+                // Ensure the original position is also active if it's not air now
+                nextActivePixels.add(index); 
             }
             
             return true;
@@ -183,13 +202,32 @@ export const GravitySystem = {
     tryMoveDiagonal: function(fromIndex, toIndex, nextActivePixels) {
         if (toIndex === -1) return false;
         
-        if (this.physics.core.type[toIndex] === this.physics.TYPE.AIR) {
+        const targetType = this.physics.core.type[toIndex];
+        const currentType = this.physics.core.type[fromIndex]; // Get current type
+
+        // Define conditions for diagonal movement (sliding)
+        let canSlide = false;
+
+        if (currentType === this.physics.TYPE.SOIL) {
+            // Soil can slide into Air or Water
+            canSlide = (targetType === this.physics.TYPE.AIR || targetType === this.physics.TYPE.WATER);
+        } else {
+            // Other falling types (Seed, Dead Matter, Worm, Insect) typically slide only into Air
+            canSlide = (targetType === this.physics.TYPE.AIR);
+        }
+
+        // If conditions met, swap pixels
+        if (canSlide) {
             // Use core's swap function
             this.physics.core.swapPixels(fromIndex, toIndex);
             
             // Mark new position as active
             nextActivePixels.add(toIndex);
-            
+            if (this.physics.core.type[fromIndex] !== this.physics.TYPE.AIR) {
+                 // Ensure the original position is also active if it's not air now
+                nextActivePixels.add(fromIndex);
+            }
+
             return true;
         }
         
