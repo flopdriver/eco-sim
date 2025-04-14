@@ -49,6 +49,8 @@ export const DecompositionSystem = {
         }
 
         // Apply gravity to dead matter - it should gradually settle to the ground
+        // REMOVED: This is now handled by the GravitySystem
+        /*
         const downIndex = this.core.getIndex(x, y + 1);
         if (downIndex !== -1 && this.core.type[downIndex] === this.TYPE.AIR && Math.random() < 0.3) {
             // Move dead matter downward if there's air below
@@ -65,6 +67,8 @@ export const DecompositionSystem = {
             this.biology.processedThisFrame[downIndex] = 1;
             return;
         }
+        */
+        const downIndex = this.core.getIndex(x, y + 1); // Keep downIndex definition for decomposition logic below
 
         // Environmental factors that affect decomposition
         let decompositionRate = 1.0; // Base rate
@@ -119,27 +123,23 @@ export const DecompositionSystem = {
                     this.core.type[index] = this.TYPE.AIR;
                     nextActivePixels.add(downIndex);
                 } else if (this.core.type[downIndex] === this.TYPE.AIR) {
-                    // If above air and not on ground level, try to fall down
-                    // This simulates dead matter gradually sinking to the ground
+                    // If above air, turn into air. Nutrients dissipate.
+                    // Let GravitySystem handle the falling of the original dead matter
                     this.core.type[index] = this.TYPE.AIR;
-                    this.core.type[downIndex] = this.TYPE.DEAD_MATTER;
-                    this.core.metadata[downIndex] = this.core.metadata[index];
-                    this.core.nutrient[downIndex] = this.core.nutrient[index];
-                    this.core.energy[downIndex] = this.core.energy[index];
-                    nextActivePixels.add(downIndex);
+                    // Optionally: Add some nutrient value to the air or nearby elements if needed
+                    // this.core.nutrient[downIndex] += 5; // Example: Add small nutrient to air below
+                    // nextActivePixels.add(downIndex); 
                 } else {
-                    // Convert to fertile soil in place
-                    this.core.type[index] = this.TYPE.SOIL;
-                    this.core.state[index] = this.STATE.FERTILE;
-                    this.core.nutrient[index] = 25 + Math.floor(Math.random() * 10);
-                    nextActivePixels.add(index);
+                    // If above anything else (Plant, another Dead Matter, etc.), turn into AIR
+                    // Add nutrients to the object below
+                    this.core.nutrient[downIndex] += 15 + Math.floor(Math.random() * 8);
+                    this.core.type[index] = this.TYPE.AIR; 
+                    nextActivePixels.add(downIndex);
                 }
             } else {
-                // Convert to fertile soil in place if at bottom or no pixel below
-                this.core.type[index] = this.TYPE.SOIL;
-                this.core.state[index] = this.STATE.FERTILE;
-                this.core.nutrient[index] = 25 + Math.floor(Math.random() * 10);
-                nextActivePixels.add(index);
+                // At the bottom of the world, turn into AIR (or perhaps shallow fertile soil? For now, AIR)
+                this.core.type[index] = this.TYPE.AIR;
+                // Maybe add nutrients to nearby ground if possible, or just dissipate
             }
             return;
         }
