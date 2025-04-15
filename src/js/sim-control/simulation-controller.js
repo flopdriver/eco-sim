@@ -25,9 +25,12 @@ const SimulationController = {
     // Runtime state
     running: false,
     simulationSpeed: 1,
+    lastFrameTime: 0,
+    targetFrameTime: 16.67, // Target 60 FPS (1000ms / 60)
 
     // Active pixel tracking
     activePixels: null,
+    nextActivePixels: null,
 
     // Type and state enums
     TYPE: null,
@@ -42,8 +45,9 @@ const SimulationController = {
             return null;
         }
 
-        // Initialize active pixels set
+        // Initialize active pixels sets
         this.activePixels = new Set();
+        this.nextActivePixels = new Set();
 
         // Initialize all module managers
         this.systemManager = SystemManager.init(this);
@@ -110,8 +114,9 @@ const SimulationController = {
     start: function() {
         console.log("Starting simulation...");
         this.running = true;
+        this.lastFrameTime = performance.now();
         this.performanceManager.resetTiming();
-        requestAnimationFrame(() => this.update());
+        requestAnimationFrame((timestamp) => this.update(timestamp));
     },
 
     // Stop the simulation
@@ -146,6 +151,7 @@ const SimulationController = {
 
         // Clear active pixels
         this.activePixels.clear();
+        this.nextActivePixels.clear();
 
         // Re-initialize environment
         this.environmentInitializer.initializeEnvironment();
@@ -158,62 +164,43 @@ const SimulationController = {
     },
 
     // Main update loop
-    update: function() {
-        // console.log("Entering SimulationController.update..."); // DEBUG
-        if (!this.running) {
-            // console.log("Simulation not running, exiting update."); // DEBUG
-            return;
-        }
+    update: function(timestamp) {
+        if (!this.running) return;
+
+        // Calculate frame time and adjust simulation speed if needed
+        const frameTime = timestamp - this.lastFrameTime;
+        this.lastFrameTime = timestamp;
 
         // Track performance
         this.performanceManager.startFrame();
-        // console.log(`Frame started. Active pixels: ${this.activePixels.size}`); // DEBUG
 
-        // Track pixels that will become active next frame
-        const nextActivePixels = new Set();
+        // Clear next active pixels set
+        this.nextActivePixels.clear();
 
         // Run multiple update steps based on speed setting
         for (let i = 0; i < this.simulationSpeed; i++) {
-            // console.log(`  Update step ${i + 1}/${this.simulationSpeed}`); // DEBUG
-            
             // Periodically update environmental-biological connections
             if (i === 0 && Math.random() < 0.05) {
-                // console.log("    Updating biological rates..."); // DEBUG
                 this.ecosystemBalancer.updateBiologicalRates();
             }
 
-            // Update each system in order:
+            // Update each system in order
             try {
-                // console.log("    Updating Environment..."); // DEBUG
-                this.environment.update(this.activePixels, nextActivePixels);
-                // console.log("    Environment updated."); // DEBUG
+                this.environment.update(this.activePixels, this.nextActivePixels);
+                this.physics.update(this.activePixels, this.nextActivePixels);
+                this.biology.update(this.activePixels, this.nextActivePixels);
             } catch (e) {
-                console.error("Error during Environment update:", e); this.stop(); return; 
-            }
-             try {
-                // console.log("    Updating Physics..."); // DEBUG
-                this.physics.update(this.activePixels, nextActivePixels);
-                // console.log("    Physics updated."); // DEBUG
-            } catch (e) {
-                console.error("Error during Physics update:", e); this.stop(); return; 
-            }
-            try {
-                // console.log("    Updating Biology..."); // DEBUG
-                this.biology.update(this.activePixels, nextActivePixels);
-                // console.log("    Biology updated."); // DEBUG
-            } catch (e) {
-                console.error("Error during Biology update:", e); this.stop(); return; 
+                console.error("Error during system update:", e);
+                this.stop();
+                return;
             }
 
             // Manage active pixels with performance considerations
-            // console.log(`    Pixels active before manage: ${nextActivePixels.size}`); // DEBUG
-            this.performanceManager.manageActivePixels(nextActivePixels);
-            // console.log(`    Pixels active after manage: ${nextActivePixels.size}`); // DEBUG
+            this.performanceManager.manageActivePixels(this.nextActivePixels);
 
             // Update active pixels for next iteration
-            this.activePixels = new Set(nextActivePixels);
-            nextActivePixels.clear();
-            // console.log(`  End of step ${i + 1}. Next frame active pixels: ${this.activePixels.size}`); // DEBUG
+            this.activePixels = new Set(this.nextActivePixels);
+            this.nextActivePixels.clear();
         }
 
         // End timing for this frame
@@ -221,28 +208,28 @@ const SimulationController = {
 
         // Update statistics display
         try {
-            // console.log("  Updating UI Stats..."); // DEBUG
             this.uiManager.updateStats();
-            // console.log("  UI Stats updated."); // DEBUG
         } catch (e) {
-             console.error("Error during UI Stats update:", e); this.stop(); return; 
+            console.error("Error during UI Stats update:", e);
+            this.stop();
+            return;
         }
         
         // Render
         try {
-            // console.log("  Rendering..."); // DEBUG
             this.rendering.render();
-            // console.log("  Rendering complete."); // DEBUG
         } catch (e) {
-             console.error("Error during Rendering:", e); this.stop(); return; 
+            console.error("Error during Rendering:", e);
+            this.stop();
+            return;
         }
 
-        // Schedule next update
+        // Schedule next update with frame timing
         if (this.running) {
-            // console.log("Scheduling next frame..."); // DEBUG
-            requestAnimationFrame(() => this.update());
-        } else {
-            // console.log("Simulation stopped, not scheduling next frame."); // DEBUG
+            const nextFrameTime = Math.max(0, this.targetFrameTime - (performance.now() - timestamp));
+            setTimeout(() => {
+                requestAnimationFrame((nextTimestamp) => this.update(nextTimestamp));
+            }, nextFrameTime);
         }
     }
 };

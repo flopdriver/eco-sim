@@ -66,8 +66,7 @@ export const PhysicsSystem = {
 
         // Process falling objects (seeds, dead matter, etc)
         if (this.gravity) {
-            // Ensure gravity is applied to every eligible pixel
-            // First, collect all pixels affected by gravity
+            // Get gravity-affected types
             const gravityAffectedTypes = [
                 this.TYPE.SEED,
                 this.TYPE.DEAD_MATTER,
@@ -75,29 +74,33 @@ export const PhysicsSystem = {
                 this.TYPE.WORM
             ];
             
-            // Check for pixels that should be falling but aren't active
+            // Create a set for gravity-affected pixels
             const gravityPixels = new Set();
             
-            // Add all active pixels of gravity-affected types
-            activePixels.forEach(index => {
+            // Add active pixels of gravity-affected types
+            for (const index of activePixels) {
                 if (gravityAffectedTypes.includes(this.core.type[index])) {
                     gravityPixels.add(index);
                 }
-            });
+            }
             
-            // Periodic full-grid gravity check (every 30 frames)
-            if (Math.random() < 0.03) {
-                for (let i = 0; i < this.core.size; i++) {
-                    if (gravityAffectedTypes.includes(this.core.type[i]) && !activePixels.has(i)) {
-                        // Check if there's air or water below this pixel
-                        const coords = this.core.getCoords(i);
-                        const belowIndex = this.core.getIndex(coords.x, coords.y + 1);
-                        
-                        if (belowIndex !== -1 && 
-                            (this.core.type[belowIndex] === this.TYPE.AIR || 
-                             this.core.type[belowIndex] === this.TYPE.WATER)) {
-                            // This pixel should be falling but isn't active
-                            gravityPixels.add(i);
+            // Only do full grid check every 60 frames (reduced from 30)
+            if (Math.random() < 0.016) {
+                // Only check active chunks for gravity-affected pixels
+                for (const chunkIndex of this.core.activeChunks) {
+                    const chunk = this.core.chunks[chunkIndex];
+                    for (let y = chunk.y; y < chunk.y + chunk.height; y++) {
+                        for (let x = chunk.x; x < chunk.x + chunk.width; x++) {
+                            const index = this.core.getIndex(x, y);
+                            if (gravityAffectedTypes.includes(this.core.type[index]) && !activePixels.has(index)) {
+                                // Check if there's air or water below this pixel
+                                const belowIndex = this.core.getIndex(x, y + 1);
+                                if (belowIndex !== -1 && 
+                                    (this.core.type[belowIndex] === this.TYPE.AIR || 
+                                     this.core.type[belowIndex] === this.TYPE.WATER)) {
+                                    gravityPixels.add(index);
+                                }
+                            }
                         }
                     }
                 }
@@ -116,6 +119,9 @@ export const PhysicsSystem = {
         if (this.airDynamics) {
             this.airDynamicsSystem.updateAirDynamics(activePixels, nextActivePixels);
         }
+
+        // Clear active chunks at the end of the frame
+        this.core.clearActiveChunks();
     },
     
     // Dramatically enhanced seed scattering for aggressive Jumanji-like propagation
@@ -124,24 +130,33 @@ export const PhysicsSystem = {
         const surfaceSeeds = [];
         const activeFlowers = [];
         
-        for (const index of activePixels) {
-            const coords = this.core.getCoords(index);
-            
-            // Process seeds on surfaces
-            if (this.core.type[index] === this.TYPE.SEED) {
-                // Check if seed is on a surface
-                const downIndex = this.core.getIndex(coords.x, coords.y + 1);
-                if (downIndex !== -1 && 
-                    (this.core.type[downIndex] === this.TYPE.SOIL || 
-                     this.core.type[downIndex] === this.TYPE.PLANT)) {
-                    surfaceSeeds.push({index, x: coords.x, y: coords.y});
+        // Only process active chunks
+        for (const chunkIndex of this.core.activeChunks) {
+            const chunk = this.core.chunks[chunkIndex];
+            for (let y = chunk.y; y < chunk.y + chunk.height; y++) {
+                for (let x = chunk.x; x < chunk.x + chunk.width; x++) {
+                    const index = this.core.getIndex(x, y);
+                    if (activePixels.has(index)) {
+                        const coords = this.core.getCoords(index);
+                        
+                        // Process seeds on surfaces
+                        if (this.core.type[index] === this.TYPE.SEED) {
+                            // Check if seed is on a surface
+                            const downIndex = this.core.getIndex(coords.x, coords.y + 1);
+                            if (downIndex !== -1 && 
+                                (this.core.type[downIndex] === this.TYPE.SOIL || 
+                                 this.core.type[downIndex] === this.TYPE.PLANT)) {
+                                surfaceSeeds.push({index, x: coords.x, y: coords.y});
+                            }
+                        }
+                        
+                        // Track flowers for explosive seed production
+                        if (this.core.type[index] === this.TYPE.PLANT && 
+                            this.core.state[index] === this.STATE.FLOWER) {
+                            activeFlowers.push({index, x: coords.x, y: coords.y});
+                        }
+                    }
                 }
-            }
-            
-            // Track flowers for explosive seed production
-            if (this.core.type[index] === this.TYPE.PLANT && 
-                this.core.state[index] === this.STATE.FLOWER) {
-                activeFlowers.push({index, x: coords.x, y: coords.y});
             }
         }
         

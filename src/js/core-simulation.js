@@ -7,12 +7,13 @@ export const CoreSimulation = {
     height: 300,
     pixelSize: 3,
     size: 0, // Will be calculated as width * height
+    chunkSize: 16, // Size of spatial chunks
 
     // Type and state enums (will be populated by controller)
     TYPE: null,
     STATE: null,
 
-    // Data arrays
+    // Data arrays - using Uint8Array for better memory efficiency
     type: null,     // Pixel type (air, water, soil, plant, etc.)
     state: null,    // Pixel state (default, wet, dry, stem, leaf, etc.)
     water: null,    // Water content (0-255)
@@ -20,6 +21,10 @@ export const CoreSimulation = {
     energy: null,   // Energy/light level (0-255)
     metadata: null, // Additional data for complex behaviors
     cloud: null,    // Cloud data (0-255 for density)
+
+    // Spatial partitioning
+    chunks: null,
+    activeChunks: null,
 
     // Initialize core systems
     init: function() {
@@ -34,10 +39,52 @@ export const CoreSimulation = {
         this.water = new Uint8Array(this.size);
         this.nutrient = new Uint8Array(this.size);
         this.energy = new Uint8Array(this.size);
-        this.metadata = new Array(this.size).fill(null);
+        this.metadata = new Uint8Array(this.size); // Changed to Uint8Array
         this.cloud = new Uint8Array(this.size);
 
+        // Initialize spatial partitioning
+        this.initializeSpatialPartitioning();
+
         return this;
+    },
+
+    // Initialize spatial partitioning system
+    initializeSpatialPartitioning: function() {
+        const chunksX = Math.ceil(this.width / this.chunkSize);
+        const chunksY = Math.ceil(this.height / this.chunkSize);
+        this.chunks = new Array(chunksX * chunksY);
+        this.activeChunks = new Set();
+
+        // Initialize chunks
+        for (let y = 0; y < chunksY; y++) {
+            for (let x = 0; x < chunksX; x++) {
+                const chunkIndex = y * chunksX + x;
+                this.chunks[chunkIndex] = {
+                    x: x * this.chunkSize,
+                    y: y * this.chunkSize,
+                    width: Math.min(this.chunkSize, this.width - x * this.chunkSize),
+                    height: Math.min(this.chunkSize, this.height - y * this.chunkSize),
+                    active: false
+                };
+            }
+        }
+    },
+
+    // Get chunk index from coordinates
+    getChunkIndex: function(x, y) {
+        const chunkX = Math.floor(x / this.chunkSize);
+        const chunkY = Math.floor(y / this.chunkSize);
+        const chunksX = Math.ceil(this.width / this.chunkSize);
+        return chunkY * chunksX + chunkX;
+    },
+
+    // Mark a chunk as active
+    markChunkActive: function(x, y) {
+        const chunkIndex = this.getChunkIndex(x, y);
+        if (chunkIndex >= 0 && chunkIndex < this.chunks.length) {
+            this.chunks[chunkIndex].active = true;
+            this.activeChunks.add(chunkIndex);
+        }
     },
 
     // Get index from coordinates with boundary checking
@@ -61,6 +108,7 @@ export const CoreSimulation = {
     // Get all neighboring indices of a position (including diagonals)
     getNeighborIndices: function(x, y) {
         const neighbors = [];
+        const chunkIndex = this.getChunkIndex(x, y);
 
         for (let dy = -1; dy <= 1; dy++) {
             for (let dx = -1; dx <= 1; dx++) {
@@ -77,6 +125,8 @@ export const CoreSimulation = {
                         index: index,
                         diagonal: dx !== 0 && dy !== 0
                     });
+                    // Mark neighboring chunks as active
+                    this.markChunkActive(nx, ny);
                 }
             }
         }
@@ -87,7 +137,6 @@ export const CoreSimulation = {
     // Get vertical neighbors (up, down)
     getVerticalNeighbors: function(x, y) {
         const neighbors = [];
-
         const directions = [
             {dx: 0, dy: -1}, // Up
             {dx: 0, dy: 1}   // Down
@@ -105,6 +154,8 @@ export const CoreSimulation = {
                     index: index,
                     direction: dir.dy < 0 ? 'up' : 'down'
                 });
+                // Mark neighboring chunks as active
+                this.markChunkActive(nx, ny);
             }
         }
 
@@ -114,7 +165,6 @@ export const CoreSimulation = {
     // Get horizontal neighbors (left, right)
     getHorizontalNeighbors: function(x, y) {
         const neighbors = [];
-
         const directions = [
             {dx: -1, dy: 0}, // Left
             {dx: 1, dy: 0}   // Right
@@ -132,6 +182,8 @@ export const CoreSimulation = {
                     index: index,
                     direction: dir.dx < 0 ? 'left' : 'right'
                 });
+                // Mark neighboring chunks as active
+                this.markChunkActive(nx, ny);
             }
         }
 
@@ -167,6 +219,12 @@ export const CoreSimulation = {
         this.energy[index2] = tempEnergy;
         this.metadata[index2] = tempMetadata;
 
+        // Mark both chunks as active
+        const coords1 = this.getCoords(index1);
+        const coords2 = this.getCoords(index2);
+        this.markChunkActive(coords1.x, coords1.y);
+        this.markChunkActive(coords2.x, coords2.y);
+
         return true;
     },
 
@@ -180,6 +238,10 @@ export const CoreSimulation = {
         this.nutrient[index] = 0;
         this.energy[index] = 0;
         this.metadata[index] = 0;
+
+        // Mark chunk as active
+        const coords = this.getCoords(index);
+        this.markChunkActive(coords.x, coords.y);
 
         return true;
     },
@@ -196,29 +258,51 @@ export const CoreSimulation = {
         return this.state[index] === state;
     },
 
-    // Find all pixels of a certain type
+    // Find all pixels of a certain type in active chunks
     findPixelsOfType: function(type) {
         const indices = [];
-
-        for (let i = 0; i < this.size; i++) {
-            if (this.type[i] === type) {
-                indices.push(i);
+        
+        // Only search in active chunks
+        for (const chunkIndex of this.activeChunks) {
+            const chunk = this.chunks[chunkIndex];
+            for (let y = chunk.y; y < chunk.y + chunk.height; y++) {
+                for (let x = chunk.x; x < chunk.x + chunk.width; x++) {
+                    const index = this.getIndex(x, y);
+                    if (this.type[index] === type) {
+                        indices.push(index);
+                    }
+                }
             }
         }
 
         return indices;
     },
 
-    // Count pixels of a certain type
+    // Count pixels of a certain type in active chunks
     countPixelsOfType: function(type) {
         let count = 0;
-
-        for (let i = 0; i < this.size; i++) {
-            if (this.type[i] === type) {
-                count++;
+        
+        // Only count in active chunks
+        for (const chunkIndex of this.activeChunks) {
+            const chunk = this.chunks[chunkIndex];
+            for (let y = chunk.y; y < chunk.y + chunk.height; y++) {
+                for (let x = chunk.x; x < chunk.x + chunk.width; x++) {
+                    const index = this.getIndex(x, y);
+                    if (this.type[index] === type) {
+                        count++;
+                    }
+                }
             }
         }
 
         return count;
+    },
+
+    // Clear active chunks at the end of each frame
+    clearActiveChunks: function() {
+        this.activeChunks.clear();
+        for (const chunk of this.chunks) {
+            chunk.active = false;
+        }
     }
 };
